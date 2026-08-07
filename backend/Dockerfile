@@ -1,26 +1,44 @@
-FROM python:3.11-slim
+# ── Build stage (has gcc, g++, dev headers) ──
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# System deps for matplotlib + psycopg2 + scanner-v3 (jugaad-data needs libxml2)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc g++ libpq-dev libxml2-dev libxslt1-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# Install backend deps (path is relative to build context = scanner-dashboard root)
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install all Python deps into a virtual env (so we can copy just the venv later)
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Pre-install scanner-v3 deps (so scanner.py works as subprocess)
-RUN pip install --no-cache-dir \
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir \
     pandas>=2.0 numpy>=1.24 yfinance>=0.2.30 \
     jugaad-data>=0.14 matplotlib>=3.7 mplfinance>=0.12.9b \
     requests>=2.31 python-dateutil>=2.8
 
+# ── Runtime stage (no gcc, no dev headers — just runtime libs) ──
+FROM python:3.11-slim AS runtime
+
+# Only runtime shared libs (no gcc/g++/dev headers)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 libxml2 libxslt1.1 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy the venv from builder (has all pip packages, no build tools)
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+
 # Copy backend app code
 COPY backend/ .
 
-# Copy scanner-v3 engine INTO the image (no external mount needed)
+# Copy scanner-v3 engine INTO the image
 COPY scanner-v3 /scanner-v3
 
 ENV SCANNER_V3_PATH=/scanner-v3
