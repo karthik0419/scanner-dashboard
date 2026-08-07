@@ -1,0 +1,40 @@
+# Production Dockerfile — bakes scanner-v3 into the image
+# Use this for cloud deployment (Railway/Render/AWS) where you can't mount scanner-v3.
+#
+# Build from scanner-dashboard/ root:
+#   docker build -f backend/Dockerfile.production -t scanner-dashboard-backend .
+#
+# The build context must include both backend/ and scanner-v3/
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System deps for matplotlib + psycopg2
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ libpq-dev git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy scanner-v3 first (so it's available at /scanner-v3)
+COPY scanner-v3/ /scanner-v3/
+
+# Install scanner-v3 dependencies
+RUN pip install --no-cache-dir \
+    pandas numpy yfinance jugaad-data matplotlib mplfinance requests python-dateutil
+
+# Copy backend code
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY backend/ .
+
+# scanner-v3 is at /scanner-v3 (baked into image)
+ENV SCANNER_V3_PATH=/scanner-v3
+ENV PYTHONPATH=/app:/scanner-v3
+
+# Create results + cache dirs (writable)
+RUN mkdir -p /scanner-v3/results /scanner-v3/cache /scanner-v3/data/cache
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

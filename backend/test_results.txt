@@ -1,0 +1,46 @@
+
+=== 1. Health ===
+  [PASS] GET /api/health
+
+=== 2. Auth ===
+  [PASS] POST /api/auth/register
+  [PASS] POST /api/auth/login
+  [PASS] GET /api/auth/me
+
+=== 3. Scans (list) ===
+  [PASS] GET /api/scans (3 scans)
+
+=== 4. Saved Screens CRUD ===
+  [PASS] POST /api/screens (create)
+  [PASS] GET /api/screens (list)
+  [PASS] GET /api/screens/{id}
+  [PASS] DELETE /api/screens/{id}
+
+=== 5. Alerts CRUD ===
+  [PASS] POST /api/alerts (create)
+  [PASS] GET /api/alerts (list)
+  [PASS] PUT /api/alerts/{id}/toggle
+  [PASS] DELETE /api/alerts/{id}
+
+=== 6. Market Data ===
+  [PASS] GET /api/market/sectors (13 sectors)
+  [PASS] GET /api/market/regime (RISK_OFF)
+
+=== 7. Paper Tracker ===
+  [PASS] GET /api/tracker (0 trades)
+  [PASS] GET /api/tracker/summary (total=0)
+
+=== 8. Scan Trigger (test mode — 50 stocks) ===
+  [PASS] POST /api/scans/trigger (scan_id=4c591f87...)
+  [PASS] GET /api/scans/{id} (status=queued)
+
+=== 9. Charts ===
+  [PASS] GET /api/charts/RELIANCE (expected 404 — chart may not exist yet)
+
+=== 10. OpenAPI Docs ===
+  [PASS] GET /docs (Swagger UI)
+  [PASS] GET /openapi.json
+
+==================================================
+RESULTS: 22 passed, 0 failed
+==================================================

@@ -1,0 +1,59 @@
+# ── Environment files (secrets) ──
+.env
+*.env
+!.env.example
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# ── Node.js ──
+node_modules/
+.next/
+out/
+build/
+*.tsbuildinfo
+.npm/
+.pnpm-store/
+
+# ── Docker ──
+# Don't commit the scanner-v3 copy (it's copied at build time from sibling folder)
+scanner-v3/
+
+# ── IDE ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Logs ──
+*.log
+logs/
+
+# ── Database ──
+*.db
+*.sqlite
+*.sqlite3
+
+# ── OS ──
+.DS_Store
+desktop.ini
+
+# ── Test artifacts ──
+.pytest_cache/
+.coverage
+htmlcov/
+test_*.xml

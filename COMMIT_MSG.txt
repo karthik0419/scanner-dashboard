@@ -1,0 +1,24 @@
+Initial commit: scanner-dashboard v1.0 — full-stack Docker dashboard for scanner-v3
+
+5-container Docker Compose setup:
+- PostgreSQL 16 (database)
+- Redis 7 (task queue)
+- FastAPI backend (auth, scans, picks, screens, tracker, market, charts)
+- arq worker (runs scanner.py as subprocess, killable)
+- Next.js 14 frontend (light theme, 7 scan presets, kill button)
+
+Features:
+- 7 one-click scan presets matching .bat menu options
+- Kill/cancel running scans (taskkill /F /PID, worker survives)
+- Worker health endpoint (/api/scans/health/worker)
+- Auto-restart on all app containers (restart: unless-stopped)
+- scanner-v3 engine baked into Docker image (no external mount)
+- JWT auth, per-user data isolation
+- Paper tracker with re-entry support
+- Saved screens, market overview, chart generation
+
+Verified: dashboard picks identical to local .bat output (same stocks, scores, patterns).
+
+Generated with [Devin](https://devin.ai)
+
+Co-Authored-By: Devin <158243242+devin-ai-integration[bot]@users.noreply.github.com>

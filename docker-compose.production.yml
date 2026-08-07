@@ -1,0 +1,83 @@
+version: "3.9"
+
+# Production docker-compose — bakes scanner-v3 into the image.
+# Use this for single-server deployment (EC2, VPS, etc.)
+#
+# Build from scanner-dashboard/ root:
+#   docker-compose -f docker-compose.production.yml up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-scanner}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-scanner}
+      POSTGRES_DB: ${DB_NAME:-scanner_dashboard}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-scanner}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.production
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${DB_USER:-scanner}:${DB_PASSWORD:-scanner}@postgres:5432/${DB_NAME:-scanner_dashboard}
+      REDIS_URL: redis://redis:6379/0
+      SCANNER_V3_PATH: /scanner-v3
+      JWT_SECRET: ${JWT_SECRET:-change-this-to-a-random-64-char-string}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.production
+    command: arq app.services.worker.WorkerSettings
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${DB_USER:-scanner}:${DB_PASSWORD:-scanner}@postgres:5432/${DB_NAME:-scanner_dashboard}
+      REDIS_URL: redis://redis:6379/0
+      SCANNER_V3_PATH: /scanner-v3
+      JWT_SECRET: ${JWT_SECRET:-change-this-to-a-random-64-char-string}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:

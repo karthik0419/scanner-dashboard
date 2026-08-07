@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  border-color: #e5e7eb;
+}
+
+body {
+  background-color: #f6f7f9;
+  color: #4b5563;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* ── Focus ring (accessibility) ── */
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #4f46e5, 0 0 0 4px #ffffff;
+}
+
+/* ── Selection ── */
+::selection {
+  background: rgba(79, 70, 229, 0.15);
+  color: #111827;
+}
+
+/* ── Number tabular figures for financial data ── */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}

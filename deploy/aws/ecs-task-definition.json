@@ -1,0 +1,99 @@
+{
+  "family": "scanner-dashboard",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/scanner-dashboard-backend:latest",
+      "essential": true,
+      "portMappings": [
+        { "containerPort": 8000, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "DATABASE_URL", "value": "postgresql+psycopg2://USER:PASS@RDS-ENDPOINT:5432/scanner_dashboard" },
+        { "name": "REDIS_URL", "value": "redis://ELASTICACHE-ENDPOINT:6379/0" },
+        { "name": "SCANNER_V3_PATH", "value": "/scanner-v3" },
+        { "name": "CORS_ORIGINS", "value": "https://your-domain.com" },
+        { "name": "JWT_SECRET", "value": "SET_VIA_SECRETS_MANAGER" },
+        { "name": "PYTHONPATH", "value": "/app:/scanner-v3" }
+      ],
+      "secrets": [
+        { "name": "JWT_SECRET", "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:scanner-dashboard-jwt-XXXXXX" }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "scanner-v3",
+          "containerPath": "/scanner-v3",
+          "readOnly": true
+        },
+        {
+          "sourceVolume": "scanner-data",
+          "containerPath": "/scanner-v3/results"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/scanner-dashboard",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "backend"
+        }
+      }
+    },
+    {
+      "name": "worker",
+      "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/scanner-dashboard-backend:latest",
+      "essential": true,
+      "command": ["arq", "app.services.worker.WorkerSettings"],
+      "environment": [
+        { "name": "DATABASE_URL", "value": "postgresql+psycopg2://USER:PASS@RDS-ENDPOINT:5432/scanner_dashboard" },
+        { "name": "REDIS_URL", "value": "redis://ELASTICACHE-ENDPOINT:6379/0" },
+        { "name": "SCANNER_V3_PATH", "value": "/scanner-v3" },
+        { "name": "PYTHONPATH", "value": "/app:/scanner-v3" }
+      ],
+      "secrets": [
+        { "name": "JWT_SECRET", "valueFrom": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:scanner-dashboard-jwt-XXXXXX" }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "scanner-v3",
+          "containerPath": "/scanner-v3",
+          "readOnly": true
+        },
+        {
+          "sourceVolume": "scanner-data",
+          "containerPath": "/scanner-v3/results"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/scanner-dashboard",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "worker"
+        }
+      }
+    }
+  ],
+  "volumes": [
+    {
+      "name": "scanner-v3",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "FS-ID",
+        "rootDirectory": "/scanner-v3"
+      }
+    },
+    {
+      "name": "scanner-data",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "FS-ID",
+        "rootDirectory": "/scanner-data"
+      }
+    }
+  ]
+}

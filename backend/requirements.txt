@@ -1,0 +1,32 @@
+# ── Web framework ──
+fastapi>=0.110
+uvicorn[standard]>=0.29
+
+# ── Database ──
+sqlalchemy>=2.0
+psycopg2-binary>=2.9
+alembic>=1.13
+
+# ── Auth ──
+pyjwt>=2.8
+bcrypt>=4.0
+python-multipart>=0.0.9
+email-validator>=2.0
+
+# ── Async task queue (lightweight, Redis-backed) ──
+arq>=0.25
+redis>=5.0
+
+# ── Utilities ──
+pydantic>=2.6
+pydantic-settings>=2.2
+python-dateutil>=2.8
+
+# ── Scanner-v3 dependencies (needed for subprocess + chart serving) ──
+pandas>=2.0
+numpy>=1.24
+yfinance>=0.2.30
+jugaad-data>=0.14
+matplotlib>=3.7
+mplfinance>=0.12.9b9
+requests>=2.31
