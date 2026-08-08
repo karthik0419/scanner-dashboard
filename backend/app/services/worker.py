@@ -236,4 +236,4 @@ class WorkerSettings:
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     max_jobs = 1  # scans are CPU-heavy; one at a time
-    job_timeout = 1800  # 30 min (PEAD scans can be slow due to screener.in)
+    job_timeout = 2700  # 45 min (full NSE swing scans + PEAD scans can be slow)

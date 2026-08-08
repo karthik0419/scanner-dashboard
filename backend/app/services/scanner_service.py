@@ -131,11 +131,11 @@ def run_scan_subprocess(
         on_pid(proc.pid)
 
     try:
-        stdout, stderr = proc.communicate(timeout=1200)  # 20 min max
+        stdout, stderr = proc.communicate(timeout=2400)  # 40 min max (full NSE ~2000 stocks)
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.communicate()
-        raise RuntimeError("scanner.py timed out after 20 minutes")
+        raise RuntimeError("scanner.py timed out after 40 minutes")
 
     duration = time.time() - start
 
