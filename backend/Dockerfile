@@ -17,7 +17,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
     pandas>=2.0 numpy>=1.24 yfinance>=0.2.30 \
     jugaad-data>=0.14 matplotlib>=3.7 mplfinance>=0.12.9b \
-    requests>=2.31 python-dateutil>=2.8
+    requests>=2.31 python-dateutil>=2.8 && \
+    pip install --no-cache-dir beautifulsoup4>=4.12 scipy>=1.11
 
 # ── Runtime stage (no gcc, no dev headers — just runtime libs) ──
 FROM python:3.11-slim AS runtime
@@ -41,8 +42,12 @@ COPY backend/ .
 # Copy scanner-v3 engine INTO the image
 COPY scanner-v3 /scanner-v3
 
+# Copy earnings-momentum-scanner (PEAD) INTO the image
+COPY earnings-momentum-scanner /earnings-momentum-scanner
+
 ENV SCANNER_V3_PATH=/scanner-v3
-ENV PYTHONPATH=/app:/scanner-v3
+ENV PEAD_SCANNER_PATH=/earnings-momentum-scanner
+ENV PYTHONPATH=/app:/scanner-v3:/earnings-momentum-scanner
 
 EXPOSE 8000
 

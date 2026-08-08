@@ -134,6 +134,26 @@ export const api = {
   hotSectors(topN = 5) {
     return request<{ sector: string; perf_5d: number; perf_20d: number }[]>(`/api/market/hot-sectors?top_n=${topN}`);
   },
+
+  // ── PEAD Scanner ────────────────────────────────────────────────────
+  triggerPeadScan(params: PeadScanParams) {
+    return request<PeadScan>('/api/pead/trigger', {
+      method: 'POST', body: JSON.stringify(params),
+    });
+  },
+  listPeadScans(limit = 20, offset = 0) {
+    return request<PeadScan[]>(`/api/pead?limit=${limit}&offset=${offset}`);
+  },
+  getPeadScan(id: string) {
+    return request<PeadScan>(`/api/pead/${id}`);
+  },
+  cancelPeadScan(id: string) {
+    return request<PeadScan>(`/api/pead/${id}/cancel`, { method: 'POST' });
+  },
+  listPeadPicks(scanId: string, filters: Record<string, string | number | boolean>) {
+    const qs = new URLSearchParams(filters as any).toString();
+    return request<PeadPicksResponse>(`/api/pead/${scanId}/picks?${qs}`);
+  },
 };
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -214,4 +234,33 @@ export interface SectorHeat {
 
 export interface MarketRegime {
   status: string; close: number | null; dma200: number | null; pct_from_dma: number | null;
+}
+
+// ── PEAD Scanner Types ────────────────────────────────────────────────
+export interface PeadScanParams {
+  mode: string; top: number; min_score: number; sector?: string;
+}
+
+export interface PeadScan {
+  id: string; status: string; mode: string; top: number; min_score: number;
+  sector: string | null; total_picks: number; error_message: string | null;
+  created_at: string; started_at: string | null; completed_at: string | null;
+  duration_seconds: number | null;
+}
+
+export interface PeadPick {
+  id: string; symbol: string; sector: string | null; status: string;
+  mode: string | null; days_since_result: number | null; days_to_result: number | null;
+  last_quarter: string | null; result_date: string | null;
+  cmp: number; entry: number | null; stop: number | null; target: number | null;
+  rr: number | null; last_net_profit: number | null; last_eps: number | null;
+  proj_profit: number | null; proj_eps: number | null; proj_yoy_growth: number | null;
+  proj_confidence: string | null; avg_spike_pct: number | null;
+  consistency_score: number | null; avg_yoy_growth: number | null;
+  growth_quarters: number | null; sector_rank: number | null; score: number | null;
+}
+
+export interface PeadPicksResponse {
+  total: number; limit: number; offset: number;
+  scan_status: string; items: PeadPick[];
 }

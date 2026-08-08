@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     # AWS/Cloud: /opt/scanner-v3 (EC2) or mount path
     scanner_v3_path: str = "../../scanner-v3"
 
+    # PEAD scanner path (earnings-momentum-scanner)
+    # Local dev: ../../earnings-momentum-scanner
+    # Docker:    /earnings-momentum-scanner
+    pead_scanner_path: str = "../../earnings-momentum-scanner"
+
     # CORS
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
 

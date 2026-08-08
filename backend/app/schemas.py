@@ -207,3 +207,61 @@ class PaginatedResponse(BaseModel):
     limit: int
     offset: int
     items: List[Any]
+
+
+# ── PEAD Scanner ──────────────────────────────────────────────────────
+class PeadScanTrigger(BaseModel):
+    mode: str = Field(default="weekly", pattern="^(weekly|daily|discovery)$")
+    top: int = Field(default=30, ge=1, le=200)
+    min_score: float = Field(default=35, ge=0, le=100)
+    sector: Optional[str] = None
+
+
+class PeadScanOut(BaseModel):
+    id: str
+    status: str
+    mode: str
+    top: int
+    min_score: float
+    sector: Optional[str]
+    total_picks: int
+    error_message: Optional[str]
+    created_at: datetime
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
+    duration_seconds: Optional[float]
+
+    class Config:
+        from_attributes = True
+
+
+class PeadPickOut(BaseModel):
+    id: str
+    symbol: str
+    sector: Optional[str]
+    status: str
+    mode: Optional[str]
+    days_since_result: Optional[int]
+    days_to_result: Optional[int]
+    last_quarter: Optional[str]
+    result_date: Optional[str]
+    cmp: float
+    entry: Optional[float]
+    stop: Optional[float]
+    target: Optional[float]
+    rr: Optional[float]
+    last_net_profit: Optional[float]
+    last_eps: Optional[float]
+    proj_profit: Optional[float]
+    proj_eps: Optional[float]
+    proj_yoy_growth: Optional[float]
+    proj_confidence: Optional[str]
+    avg_spike_pct: Optional[float]
+    consistency_score: Optional[float]
+    avg_yoy_growth: Optional[float]
+    growth_quarters: Optional[int]
+    sector_rank: Optional[int]
+    score: Optional[float]
+
+    class Config:
+        from_attributes = True

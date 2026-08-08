@@ -193,3 +193,100 @@ def generate_chart(symbol: str) -> dict:
         if os.path.isfile(path):
             charts[tf] = path
     return {"charts": charts}
+
+
+# ── PEAD Scanner ───────────────────────────────────────────────────────
+
+def _pead_scanner_dir() -> str:
+    """Resolve the earnings-momentum-scanner directory path."""
+    path = settings.pead_scanner_path
+    if not os.path.isabs(path):
+        backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        path = os.path.join(backend_dir, path)
+    if not os.path.isdir(path):
+        raise FileNotFoundError(f"PEAD scanner directory not found: {path}")
+    return path
+
+
+def build_pead_command(
+    mode: str = "weekly",
+    top: int = 30,
+    min_score: float = 35,
+    sector: Optional[str] = None,
+) -> list:
+    """Build the PEAD scanner.py CLI command."""
+    cmd = [sys.executable, "scanner.py",
+           "--mode", mode,
+           "--top", str(top),
+           "--min-score", str(min_score)]
+    if sector:
+        cmd += ["--sector", sector]
+    return cmd
+
+
+def find_latest_pead_csv(scanner_dir: str) -> Optional[str]:
+    """Find the latest PEAD scan output CSV."""
+    results_dir = os.path.join(scanner_dir, "results")
+    if not os.path.isdir(results_dir):
+        return None
+    pattern = os.path.join(results_dir, "scanner_*.csv")
+    csvs = glob.glob(pattern)
+    if not csvs:
+        return None
+    return max(csvs, key=os.path.getmtime)
+
+
+def run_pead_scan_subprocess(
+    mode: str = "weekly",
+    top: int = 30,
+    min_score: float = 35,
+    sector: Optional[str] = None,
+    on_pid: Optional[callable] = None,
+) -> dict:
+    """Run PEAD scanner.py as a subprocess and return results."""
+    scanner_dir = _pead_scanner_dir()
+    cmd = build_pead_command(mode=mode, top=top, min_score=min_score, sector=sector)
+
+    start = time.time()
+    proc = subprocess.Popen(
+        cmd, cwd=scanner_dir,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True,
+    )
+    if on_pid:
+        on_pid(proc.pid)
+
+    try:
+        stdout, stderr = proc.communicate(timeout=1800)  # 30 min max (screener.in is slow)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()
+        raise RuntimeError("PEAD scanner.py timed out after 30 minutes")
+
+    duration = time.time() - start
+
+    if proc.returncode < 0:
+        raise InterruptedError(f"PEAD scanner.py was killed (signal {-proc.returncode})")
+
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"PEAD scanner.py exited with code {proc.returncode}\n"
+            f"stderr: {stderr[-2000:]}"
+        )
+
+    csv_path = find_latest_pead_csv(scanner_dir)
+    if csv_path is None:
+        raise RuntimeError(
+            f"No output CSV found after PEAD scan.\nstdout: {stdout[-2000:]}"
+        )
+
+    df = pd.read_csv(csv_path)
+    picks = df.to_dict(orient="records")
+    return {
+        "csv_path": csv_path,
+        "picks": picks,
+        "total": len(picks),
+        "duration": duration,
+        "stdout": stdout[-2000:],
+        "stderr": stderr[-2000:],
+    }

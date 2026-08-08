@@ -29,6 +29,7 @@ build/
 # ── Docker ──
 # Don't commit the scanner-v3 copy (it's copied at build time from sibling folder)
 scanner-v3/
+earnings-momentum-scanner/
 
 # ── IDE ──
 .vscode/

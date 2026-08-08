@@ -6,11 +6,15 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { LoadingState } from '@/components/ui/States';
-import { LayoutDashboard, ScanLine, Save, Activity, TrendingUp, Settings, LogOut, Menu, X } from 'lucide-react';
+import {
+  LayoutDashboard, ScanLine, Save, Activity, TrendingUp, Settings,
+  LogOut, Menu, X, ChevronLeft, ChevronRight, Zap,
+} from 'lucide-react';
 
 const nav = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
   { href: '/dashboard/scans', label: 'Scans', icon: ScanLine },
+  { href: '/dashboard/pead', label: 'PEAD Scanner', icon: Zap },
   { href: '/dashboard/screens', label: 'Saved Screens', icon: Save },
   { href: '/dashboard/tracker', label: 'Paper Tracker', icon: Activity },
   { href: '/dashboard/market', label: 'Market', icon: TrendingUp },
@@ -22,6 +26,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const pathname = usePathname();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Persist collapse state
+  useEffect(() => {
+    const saved = localStorage.getItem('sidebar-collapsed');
+    if (saved === 'true') setCollapsed(true);
+  }, []);
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', String(collapsed));
+  }, [collapsed]);
 
   useEffect(() => {
     if (!loading && !user) router.push('/login');
@@ -37,9 +51,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen bg-bg-base">
-      {/* ── Sidebar (desktop) ── */}
-      <aside className="hidden md:flex w-60 flex-col border-r border-border bg-white">
-        <SidebarContent user={user} pathname={pathname} onLogout={logout} />
+      {/* ── Sidebar (desktop) — collapsible ── */}
+      <aside
+        className={cn(
+          'hidden md:flex flex-col border-r border-border bg-white transition-all duration-200 ease-in-out relative group',
+          collapsed ? 'w-16' : 'w-60'
+        )}
+      >
+        <SidebarContent
+          user={user}
+          pathname={pathname}
+          onLogout={logout}
+          collapsed={collapsed}
+        />
+        {/* Collapse toggle button */}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className={cn(
+            'absolute -right-3 top-20 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-white shadow-sm hover:bg-bg-hover transition-all',
+            'opacity-0 group-hover:opacity-100'
+          )}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+        </button>
       </aside>
 
       {/* ── Mobile nav drawer ── */}
@@ -54,7 +89,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               <X className="h-5 w-5" />
             </button>
-            <SidebarContent user={user} pathname={pathname} onLogout={logout} />
+            <SidebarContent user={user} pathname={pathname} onLogout={logout} collapsed={false} />
           </aside>
         </div>
       )}
@@ -89,20 +124,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   );
 }
 
-function SidebarContent({ user, pathname, onLogout }: {
+function SidebarContent({ user, pathname, onLogout, collapsed }: {
   user: { name: string; email: string };
   pathname: string;
   onLogout: () => void;
+  collapsed: boolean;
 }) {
   return (
     <>
-      <div className="flex items-center gap-2.5 px-5 py-5 border-b border-border">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent">
+      {/* Header */}
+      <div className={cn('flex items-center border-b border-border py-5', collapsed ? 'justify-center px-2' : 'gap-2.5 px-5')}>
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-accent">
           <TrendingUp className="h-5 w-5 text-white" />
         </div>
-        <span className="font-bold text-text-primary">Scanner</span>
+        {!collapsed && <span className="font-bold text-text-primary">Scanner</span>}
       </div>
 
+      {/* Nav */}
       <nav className="flex-1 space-y-0.5 px-3 py-4" aria-label="Main navigation">
         {nav.map(item => {
           const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
@@ -110,9 +148,11 @@ function SidebarContent({ user, pathname, onLogout }: {
             <Link
               key={item.href}
               href={item.href}
+              title={collapsed ? item.label : undefined}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
+                'flex items-center rounded-lg text-sm font-medium transition-all duration-150',
                 'min-h-[40px]',
+                collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
                 active
                   ? 'bg-accent-muted text-accent font-semibold'
                   : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
@@ -120,22 +160,30 @@ function SidebarContent({ user, pathname, onLogout }: {
               aria-current={active ? 'page' : undefined}
             >
               <item.icon className="h-4 w-4 flex-shrink-0" />
-              {item.label}
+              {!collapsed && item.label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="border-t border-border p-3">
-        <div className="px-3 py-2 mb-1">
-          <p className="text-sm font-medium text-text-primary truncate">{user.name}</p>
-          <p className="text-xs text-text-tertiary truncate">{user.email}</p>
-        </div>
+      {/* User section */}
+      <div className={cn('border-t border-border p-3', collapsed && 'px-2')}>
+        {!collapsed && (
+          <div className="px-3 py-2 mb-1">
+            <p className="text-sm font-medium text-text-primary truncate">{user.name}</p>
+            <p className="text-xs text-text-tertiary truncate">{user.email}</p>
+          </div>
+        )}
         <button
           onClick={onLogout}
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-text-secondary hover:bg-bg-hover hover:text-text-primary w-full transition-colors min-h-[40px]"
+          title={collapsed ? 'Logout' : undefined}
+          className={cn(
+            'flex items-center rounded-lg text-sm text-text-secondary hover:bg-bg-hover hover:text-text-primary w-full transition-colors min-h-[40px]',
+            collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5'
+          )}
         >
-          <LogOut className="h-4 w-4" /> Logout
+          <LogOut className="h-4 w-4 flex-shrink-0" />
+          {!collapsed && 'Logout'}
         </button>
       </div>
     </>

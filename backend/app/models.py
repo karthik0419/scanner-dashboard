@@ -166,3 +166,65 @@ class PaperTrade(Base):
     tradeable = Column(String, default="TRADE")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ── PEAD Scanner (earnings-momentum-scanner) ──────────────────────────
+
+class PeadScan(Base):
+    __tablename__ = "pead_scans"
+
+    id = Column(String, primary_key=True, default=_uuid_str)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    status = Column(String, default=ScanStatus.queued.value, index=True)
+    process_pid = Column(Integer, nullable=True)
+    # PEAD scan parameters
+    mode = Column(String, default="weekly")  # weekly / daily / discovery
+    top = Column(Integer, default=30)
+    min_score = Column(Float, default=35)
+    sector = Column(String, nullable=True)
+    # Results
+    total_picks = Column(Integer, default=0)
+    csv_path = Column(String, nullable=True)
+    error_message = Column(Text, nullable=True)
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    duration_seconds = Column(Float, nullable=True)
+
+    picks = relationship("PeadPick", back_populates="scan", cascade="all, delete-orphan")
+
+
+class PeadPick(Base):
+    __tablename__ = "pead_picks"
+
+    id = Column(String, primary_key=True, default=_uuid_str)
+    scan_id = Column(String, ForeignKey("pead_scans.id"), nullable=False, index=True)
+    # PEAD scanner output columns
+    symbol = Column(String, index=True)
+    sector = Column(String, nullable=True, index=True)
+    status = Column(String, index=True)  # ENTER NOW / WATCH
+    mode = Column(String, nullable=True)  # post / pre
+    days_since_result = Column(Integer, nullable=True)
+    days_to_result = Column(Integer, nullable=True)
+    last_quarter = Column(String, nullable=True)
+    result_date = Column(String, nullable=True)
+    cmp = Column(Float)
+    entry = Column(Float, nullable=True)
+    stop = Column(Float, nullable=True)
+    target = Column(Float, nullable=True)
+    rr = Column(Float, nullable=True)
+    last_net_profit = Column(Float, nullable=True)
+    last_eps = Column(Float, nullable=True)
+    proj_profit = Column(Float, nullable=True)
+    proj_eps = Column(Float, nullable=True)
+    proj_yoy_growth = Column(Float, nullable=True)
+    proj_confidence = Column(String, nullable=True)
+    avg_spike_pct = Column(Float, nullable=True)
+    consistency_score = Column(Float, nullable=True)
+    avg_yoy_growth = Column(Float, nullable=True)
+    growth_quarters = Column(Integer, nullable=True)
+    sector_rank = Column(Integer, nullable=True)
+    score = Column(Float, index=True)
+
+    scan = relationship("PeadScan", back_populates="picks")
