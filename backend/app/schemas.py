@@ -12,7 +12,8 @@ class UserCreate(BaseModel):
 
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    # Use str (not EmailStr) so guest login with plain "guest" works
+    email: str
     password: str
 
 

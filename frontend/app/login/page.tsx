@@ -30,7 +30,7 @@ export default function LoginPage() {
   const handleGuestLogin = async () => {
     setLoading(true);
     try {
-      await login('guest@guest.com', 'guest');
+      await login('guest', 'guest');
       toast.success('Welcome, Guest! Look around — data is shared.');
     } catch (err: any) {
       toast.error(err.message || 'Guest login failed');

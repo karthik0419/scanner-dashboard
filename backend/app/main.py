@@ -25,17 +25,17 @@ def _ensure_guest_user():
     """Create a guest user on startup if it doesn't exist."""
     db = SessionLocal()
     try:
-        existing = db.query(User).filter(User.email == "guest@guest.com").first()
+        existing = db.query(User).filter(User.email == "guest").first()
         if not existing:
             guest = User(
-                email="guest@guest.com",
+                email="guest",
                 name="Guest",
                 hashed_password=hash_password("guest"),
                 plan="free",
             )
             db.add(guest)
             db.commit()
-            print("[startup] Guest user created (guest@guest.com / guest)")
+            print("[startup] Guest user created (guest / guest)")
         else:
             print("[startup] Guest user already exists")
     except Exception as e:
