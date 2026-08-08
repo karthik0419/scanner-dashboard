@@ -13,6 +13,7 @@ import {
   Zap, ChevronRight, AlertCircle, XCircle, TrendingUp,
   Calendar, Globe, FlaskConical, Target, Award, BarChart3,
 } from 'lucide-react';
+import { InstructionsBanner } from '@/components/ui/Instructions';
 
 // ── PEAD scan presets ──
 interface PeadPreset {
@@ -190,21 +191,20 @@ export default function PeadPage() {
         </Button>
       </div>
 
-      {/* Info banner */}
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-        <div className="flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="font-medium">How PEAD works</p>
-            <p className="mt-1 text-blue-700">
-              Stocks that gap up strongly on quarterly results tend to continue higher after a brief pullback.
-              The scanner fetches earnings from screener.in, measures price reactions, and scores setups (0-100)
-              based on earnings quality, reaction history, entry quality, and sector momentum.
-              Scans take 10-30 min due to screener.in rate limits.
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* Instructions */}
+      <InstructionsBanner
+        storageKey="pead"
+        title="How the PEAD scanner works"
+        icon={Zap}
+        variant="amber"
+        steps={[
+          { title: 'What is PEAD?', description: 'Post-Earnings Announcement Drift — stocks that gap up strongly on quarterly results tend to continue higher after a brief pullback.' },
+          { title: 'Pick a preset', description: 'Weekly = top 30 post-earnings setups. Discovery = broadest search (top 50). High Conviction = only score >= 60.' },
+          { title: 'Be patient', description: 'PEAD scans take 10-30 min because they fetch earnings data from screener.in (rate-limited at ~2s/stock).' },
+          { title: 'Read the picks', description: 'Status ENTER NOW = post-result + R:R >= 2.0. WATCH = pre-result or lower R:R. Score = earnings quality + reaction history + entry quality + sector momentum.' },
+          { title: 'Key columns', description: 'Days = days since result (post) or until result (pre). Spike% = avg price reaction on result day. Proj YoY = projected next quarter growth.' },
+        ]}
+      />
 
       {/* Presets */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">

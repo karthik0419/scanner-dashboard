@@ -10,6 +10,7 @@ import { TableSkeleton, EmptyState } from '@/components/ui/States';
 import { fmt, fmtPct, cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { RefreshCw, Activity, TrendingUp, TrendingDown, Target, Wallet } from 'lucide-react';
+import { InstructionsBanner } from '@/components/ui/Instructions';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -69,6 +70,19 @@ export default function TrackerPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <InstructionsBanner
+        storageKey="tracker"
+        title="How the paper tracker works"
+        icon={Activity}
+        variant="green"
+        steps={[
+          { title: 'What is this?', description: 'Paper tracker follows live picks from past scans — entry, SL, T1/T2, current price, P&L%, days held. No real money.' },
+          { title: 'Sync from scanner-v3', description: 'Click "Sync" to import picks from the local scanner-v3 paper_tracker.csv file.' },
+          { title: 'Statuses', description: 'WAITING_BREAKOUT = NEAR pick not yet entered. OPEN = active trade. WIN_T1 = hit target 1. LOSS = stop loss hit. RE_ENTERED = recovered after whipsaw.' },
+          { title: 'Re-entry logic', description: 'If a trade hits SL but the stock recovers above breakout within 30 days, it auto re-enters with a tight 2% stop. 49% win rate on re-entries.' },
+          { title: 'Filter', description: 'Use the status dropdown to filter by OPEN, WAITING_BREAKOUT, WIN, LOSS, etc.' },
+        ]}
+      />
       {/* Page header */}
       <div className="flex items-start justify-between gap-4">
         <div>

@@ -10,6 +10,7 @@ import { TableSkeleton, EmptyState } from '@/components/ui/States';
 import { fmt, fmtPct, cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { TrendingUp, TrendingDown, ArrowUpDown, BarChart3, AlertCircle } from 'lucide-react';
+import { InstructionsBanner } from '@/components/ui/Instructions';
 
 type SortKey = 'perf_5d' | 'perf_20d' | 'sector';
 
@@ -77,6 +78,17 @@ export default function MarketPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <InstructionsBanner
+        storageKey="market"
+        title="How to read the market overview"
+        icon={BarChart3}
+        steps={[
+          { title: 'Market regime', description: 'RISK_ON = Nifty above 200 DMA (bullish). RISK_OFF = Nifty below 200 DMA (defensive). Shows how far Nifty is from the 200 DMA line.' },
+          { title: 'Sector heat map', description: 'Shows 5-day and 20-day returns for each NSE sector. Green = outperforming, red = underperforming. Use this to pick hot sectors for scans.' },
+          { title: 'Signal', description: 'BULLISH = sector in uptrend (5d + 20d both positive). BEARISH = both negative. MIXED = one positive, one negative.' },
+          { title: 'How to use', description: 'Before running a scan, check which sectors are hot. Run Smart Daily scan — it automatically focuses on hot sectors.' },
+        ]}
+      />
       {/* Page header */}
       <div>
         <h1 className="text-2xl font-bold text-text-primary">Market</h1>

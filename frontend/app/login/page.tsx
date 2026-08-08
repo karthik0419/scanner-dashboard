@@ -27,6 +27,18 @@ export default function LoginPage() {
     }
   };
 
+  const handleGuestLogin = async () => {
+    setLoading(true);
+    try {
+      await login('guest@guest.com', 'guest');
+      toast.success('Welcome, Guest! Look around — data is shared.');
+    } catch (err: any) {
+      toast.error(err.message || 'Guest login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg-base px-4">
       <div className="w-full max-w-sm animate-slide-up">
@@ -51,6 +63,17 @@ export default function LoginPage() {
           </div>
           <Button type="submit" loading={loading} className="w-full">
             Sign In
+          </Button>
+          <div className="relative py-1">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-[10px] uppercase">
+              <span className="bg-white px-2 text-text-tertiary">or</span>
+            </div>
+          </div>
+          <Button type="button" onClick={handleGuestLogin} loading={loading} variant="secondary" className="w-full">
+            Try as Guest
           </Button>
           <p className="text-center text-xs text-text-tertiary">
             No account?{' '}

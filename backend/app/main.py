@@ -15,14 +15,40 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.database import Base, engine
+from app.database import Base, engine, SessionLocal
 from app.routers import auth, scans, picks, charts, screens, alerts, tracker, market, pead
+from app.models import User
+from app.auth import hash_password
+
+
+def _ensure_guest_user():
+    """Create a guest user on startup if it doesn't exist."""
+    db = SessionLocal()
+    try:
+        existing = db.query(User).filter(User.email == "guest@guest.com").first()
+        if not existing:
+            guest = User(
+                email="guest@guest.com",
+                name="Guest",
+                hashed_password=hash_password("guest"),
+                plan="free",
+            )
+            db.add(guest)
+            db.commit()
+            print("[startup] Guest user created (guest@guest.com / guest)")
+        else:
+            print("[startup] Guest user already exists")
+    except Exception as e:
+        print(f"[startup] Could not create guest user: {e}")
+    finally:
+        db.close()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Create tables on startup (use Alembic for migrations in production)
     Base.metadata.create_all(bind=engine)
+    _ensure_guest_user()
     yield
 
 

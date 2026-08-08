@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { LoadingState, EmptyState } from '@/components/ui/States';
 import { fmt, fmtPct, fmtDate, fmtDuration, cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Zap, ArrowRight, Activity, ScanLine, Target } from 'lucide-react';
+import { InstructionsBanner } from '@/components/ui/Instructions';
 
 export default function DashboardOverview() {
   const [scans, setScans] = useState<Scan[]>([]);
@@ -39,6 +40,17 @@ export default function DashboardOverview() {
 
   return (
     <div className="space-y-6">
+      <InstructionsBanner
+        storageKey="overview"
+        title="Welcome to Scanner Dashboard"
+        steps={[
+          { title: 'Run a scan', description: 'Go to Scans tab, pick a preset (e.g. Smart Daily), and click it. Scans take 5-15 min.' },
+          { title: 'View picks', description: 'Click a completed scan to see all stock setups with patterns, targets, and R:R.' },
+          { title: 'Track paper trades', description: 'Go to Paper Tracker to see how past picks are performing with live prices.' },
+          { title: 'Check market', description: 'Market tab shows sector rotation and whether Nifty is above/below 200 DMA.' },
+          { title: 'PEAD scanner', description: 'Separate scanner for post-earnings momentum setups. Takes 10-30 min (screener.in).' },
+        ]}
+      />
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

@@ -22,6 +22,7 @@ import {
   Pencil,
   AlertTriangle,
 } from 'lucide-react';
+import { InstructionsBanner } from '@/components/ui/Instructions';
 
 const ALERT_TYPES: { value: string; label: string }[] = [
   { value: 'price_above', label: 'Price Above' },
@@ -143,6 +144,17 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <InstructionsBanner
+        storageKey="settings"
+        title="Settings — what you can configure here"
+        icon={Bell}
+        steps={[
+          { title: 'Profile', description: 'View your account info (name, email, plan). You cannot change email — register a new account if needed.' },
+          { title: 'Price alerts', description: 'Set alerts for when a stock crosses above/below a price. Alerts are checked periodically and sent via Telegram.' },
+          { title: 'Telegram', description: 'Connect your Telegram chat ID to receive scan results and alert notifications on your phone.' },
+          { title: 'Logout', description: 'Sign out of your account. You can sign back in or use the Guest login.' },
+        ]}
+      />
       {/* Page header */}
       <div>
         <h1 className="text-2xl font-bold text-text-primary">Settings</h1>

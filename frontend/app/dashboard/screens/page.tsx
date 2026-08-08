@@ -10,6 +10,7 @@ import { EmptyState, Skeleton } from '@/components/ui/States';
 import { fmtDate } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Trash2, Filter, Plus, X, Check } from 'lucide-react';
+import { InstructionsBanner } from '@/components/ui/Instructions';
 
 const TIMEFRAMES = ['all', 'daily', 'weekly', 'monthly'];
 const STATUSES = ['all', 'BREAKOUT', 'NEAR', 'WATCH'];
@@ -122,6 +123,17 @@ export default function ScreensPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <InstructionsBanner
+        storageKey="screens"
+        title="How saved screens work"
+        icon={Filter}
+        steps={[
+          { title: 'Create a screen', description: 'Click "New Screen" to save a set of filters (pattern, timeframe, status, min score, min R:R, sector, sort).' },
+          { title: 'Apply to any scan', description: 'Saved screens can be applied to any completed scan to instantly filter its picks.' },
+          { title: 'Example', description: 'Save a screen called "High Score Daily" with pattern=any, timeframe=daily, min_score=60. Apply it to any scan to see only high-quality daily setups.' },
+          { title: 'Delete', description: 'Click the trash icon on a saved screen to remove it.' },
+        ]}
+      />
       {/* Page header */}
       <div className="flex items-start justify-between gap-4">
         <div>

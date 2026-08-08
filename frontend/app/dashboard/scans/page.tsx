@@ -11,6 +11,7 @@ import { TableSkeleton, EmptyState } from '@/components/ui/States';
 import { fmtDate, fmtDuration, cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Zap, ChevronRight, AlertCircle, ScanLine, TrendingUp, TrendingDown, FlaskConical, Clock, Globe, XCircle, Calendar, Filter } from 'lucide-react';
+import { InstructionsBanner } from '@/components/ui/Instructions';
 
 // ── Predefined scan presets (matching the .bat menu options) ──
 interface Preset {
@@ -177,6 +178,18 @@ export default function ScansPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <InstructionsBanner
+        storageKey="scans"
+        title="How to run a swing scan"
+        icon={ScanLine}
+        steps={[
+          { title: 'Pick a preset', description: 'Smart Daily = hot sectors + 100-400 Rs. Full NSE = all stocks. Quick Test = 50 stocks only (fast validation).' },
+          { title: 'Or use Custom Scan', description: 'Click "Custom Scan" to set your own top N, min score, price range, timeframe, etc.' },
+          { title: 'Wait for completion', description: 'Scans take 5-15 min. The page auto-refreshes every 3s while a scan is running.' },
+          { title: 'Click a completed scan', description: 'Opens the picks table with all stock setups — pattern, CMP, breakout, SL, T1/T2, R:R, score.' },
+          { title: 'Cancel if needed', description: 'Click "Cancel" on a queued/running scan to kill the scanner process.' },
+        ]}
+      />
       {/* Page header */}
       <div className="flex items-start justify-between gap-4">
         <div>
