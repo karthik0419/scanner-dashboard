@@ -50,11 +50,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex h-screen bg-bg-base">
+    <div className="flex h-screen bg-bg-base overflow-hidden">
       {/* ── Sidebar (desktop) — collapsible ── */}
       <aside
         className={cn(
-          'hidden md:flex flex-col border-r border-border bg-white transition-all duration-200 ease-in-out relative group',
+          'hidden md:flex flex-col border-r border-border bg-white relative group flex-shrink-0',
+          'transition-[width] duration-200 ease-in-out',
           collapsed ? 'w-16' : 'w-60'
         )}
       >
@@ -68,7 +69,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <button
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            'absolute -right-3 top-20 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-white shadow-sm hover:bg-bg-hover transition-all',
+            'absolute right-2 top-20 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-white shadow-sm hover:bg-bg-hover transition-opacity',
             'opacity-0 group-hover:opacity-100'
           )}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -95,7 +96,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* ── Main content ── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Mobile header */}
         <header className="md:hidden flex items-center justify-between border-b border-border bg-white px-4 h-14">
           <button
@@ -133,7 +134,7 @@ function SidebarContent({ user, pathname, onLogout, collapsed }: {
   return (
     <>
       {/* Header */}
-      <div className={cn('flex items-center border-b border-border py-5', collapsed ? 'justify-center px-2' : 'gap-2.5 px-5')}>
+      <div className={cn('flex items-center border-b border-border py-5 overflow-hidden whitespace-nowrap', collapsed ? 'justify-center px-2' : 'gap-2.5 px-5')}>
         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-accent">
           <TrendingUp className="h-5 w-5 text-white" />
         </div>
@@ -141,7 +142,7 @@ function SidebarContent({ user, pathname, onLogout, collapsed }: {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-0.5 px-3 py-4" aria-label="Main navigation">
+      <nav className="flex-1 space-y-0.5 px-3 py-4 overflow-hidden" aria-label="Main navigation">
         {nav.map(item => {
           const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
           return (
@@ -150,7 +151,7 @@ function SidebarContent({ user, pathname, onLogout, collapsed }: {
               href={item.href}
               title={collapsed ? item.label : undefined}
               className={cn(
-                'flex items-center rounded-lg text-sm font-medium transition-all duration-150',
+                'flex items-center rounded-lg text-sm font-medium whitespace-nowrap',
                 'min-h-[40px]',
                 collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
                 active
@@ -160,7 +161,7 @@ function SidebarContent({ user, pathname, onLogout, collapsed }: {
               aria-current={active ? 'page' : undefined}
             >
               <item.icon className="h-4 w-4 flex-shrink-0" />
-              {!collapsed && item.label}
+              {!collapsed && <span className="overflow-hidden">{item.label}</span>}
             </Link>
           );
         })}
