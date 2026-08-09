@@ -18,9 +18,13 @@ export function fmtPct(n: number | null | undefined): string {
 
 export function fmtDate(s: string | null | undefined): string {
   if (!s) return '—';
-  return new Date(s).toLocaleString('en-IN', {
+  // Backend stores UTC timestamps (datetime.utcnow) without timezone suffix.
+  // Append 'Z' so JS parses it as UTC, then toLocaleString converts to browser's local tz (IST).
+  const str = s.endsWith('Z') || s.includes('+') ? s : s + 'Z';
+  return new Date(str).toLocaleString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
+    timeZone: 'Asia/Kolkata',
   });
 }
 
