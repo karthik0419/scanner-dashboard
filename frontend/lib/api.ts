@@ -113,9 +113,15 @@ export const api = {
   },
 
   // ── Paper Tracker ───────────────────────────────────────────────────
-  listTrades(status?: string) {
-    const qs = status ? `?status=${status}` : '';
-    return request<PaperTrade[]>(`/api/tracker${qs}`);
+  listTrades(status?: string, scanDate?: string) {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (scanDate) params.set('scan_date', scanDate);
+    const qs = params.toString();
+    return request<PaperTrade[]>(`/api/tracker${qs ? '?' + qs : ''}`);
+  },
+  trackerDates() {
+    return request<ScanDateInfo[]>('/api/tracker/dates');
   },
   trackerSummary() {
     return request<TrackerSummary>('/api/tracker/summary');
@@ -225,6 +231,11 @@ export interface TrackerSummary {
   total: number; by_status: Record<string, number>;
   wins: number; losses: number; open: number;
   win_rate: number; avg_pnl: number; message?: string;
+}
+
+export interface ScanDateInfo {
+  date: string; total: number; open: number; wins: number; losses: number;
+  enter_now: number; waiting: number; avg_pnl: number;
 }
 
 export interface SectorHeat {

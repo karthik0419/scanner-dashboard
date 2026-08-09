@@ -2,9 +2,11 @@
 import os
 import glob
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
+from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.database import get_db
 from app.models import PaperTrade, User
@@ -29,6 +31,7 @@ def _tracker_csv_path() -> str | None:
 def list_trades(
     status: str | None = Query(None),
     symbol: str | None = Query(None),
+    scan_date: str | None = Query(None, description="Filter by scan date (YYYY-MM-DD)"),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -37,7 +40,46 @@ def list_trades(
         q = q.filter(PaperTrade.current_status == status)
     if symbol:
         q = q.filter(PaperTrade.symbol.ilike(f"%{symbol}%"))
-    return q.order_by(PaperTrade.scan_date.desc()).all()
+    if scan_date:
+        # Filter by date part of scan_date
+        q = q.filter(func.date(PaperTrade.scan_date) == scan_date)
+    return q.order_by(PaperTrade.scan_date.desc(), PaperTrade.score.desc()).all()
+
+
+@router.get("/dates")
+def list_scan_dates(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """List distinct scan dates with trade counts and summary stats per date."""
+    trades = db.query(PaperTrade).filter(PaperTrade.user_id == user.id).all()
+
+    # Group by date
+    by_date = defaultdict(list)
+    for t in trades:
+        if t.scan_date:
+            d = t.scan_date.date().isoformat() if hasattr(t.scan_date, 'date') else str(t.scan_date)[:10]
+            by_date[d].append(t)
+
+    result = []
+    for d in sorted(by_date.keys(), reverse=True):
+        date_trades = by_date[d]
+        open_count = sum(1 for t in date_trades if t.current_status in ('OPEN', 'WAITING_BREAKOUT', 'RE_ENTERED'))
+        win_count = sum(1 for t in date_trades if t.current_status in ('WIN_T1', 'WIN_T2'))
+        loss_count = sum(1 for t in date_trades if t.current_status == 'LOSS')
+        enter_now = sum(1 for t in date_trades if t.current_status == 'OPEN')
+        waiting = sum(1 for t in date_trades if t.current_status == 'WAITING_BREAKOUT')
+        avg_pnl = sum(t.current_pnl_pct or 0 for t in date_trades) / max(len(date_trades), 1)
+
+        result.append({
+            "date": d,
+            "total": len(date_trades),
+            "open": open_count,
+            "wins": win_count,
+            "losses": loss_count,
+            "enter_now": enter_now,
+            "waiting": waiting,
+            "avg_pnl": round(avg_pnl, 2),
+        })
+
+    return result
 
 
 @router.get("/summary")
