@@ -51,7 +51,7 @@ services:
       SCANNER_V3_PATH: /scanner-v3
       PEAD_SCANNER_PATH: /earnings-momentum-scanner
       JWT_SECRET: ${JWT_SECRET:-a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2}
-      CORS_ORIGINS: http://localhost:3001,http://localhost:3000
+      CORS_ORIGINS: http://localhost:3001,http://localhost:3000,http://192.168.1.10:3001,http://192.168.1.10:3000
     volumes:
       - scanner_data:/scanner-v3/results
       - scanner_cache:/scanner-v3/cache
@@ -110,12 +110,13 @@ services:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:8000
+        NEXT_PUBLIC_API_URL: ""   # empty = browser uses relative /api/ paths (proxied by Next.js server)
+        API_URL: http://backend:8000   # MUST be a build arg — Next.js bakes rewrites() into routes-manifest.json at build time
     ports:
       - "3001:3000"
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000   # browser-side (host port)
+      NEXT_PUBLIC_API_URL: ""                       # browser-side: relative paths (works from any device)
       API_URL: http://backend:8000                  # server-side (Docker internal)
     depends_on:
       backend:

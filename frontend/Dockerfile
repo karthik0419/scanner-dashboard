@@ -5,6 +5,14 @@ WORKDIR /app
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
+# API_URL must be present at BUILD time — Next.js bakes rewrites() into
+# routes-manifest.json during `next build`. If unset here, next.config.js
+# falls back to http://localhost:8000, which does not exist inside the
+# container (backend is on the `backend` Docker hostname), causing
+# ECONNREFUSED on every proxied /api/* call.
+ARG API_URL=http://backend:8000
+ENV API_URL=$API_URL
+
 COPY package.json package-lock.json* ./
 RUN npm ci --prefer-offline
 
@@ -17,7 +25,6 @@ FROM node:20-alpine AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV NEXT_PUBLIC_API_URL=http://localhost:8000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
