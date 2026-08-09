@@ -5,6 +5,90 @@ Append newest entries to the top.
 
 ---
 
+## 2026-08-09 — "Frequent disconnects" on phone (dashboard + Swagger UI)
+
+**Symptom (reported):** Frequent disconnections observed on the phone for both
+the dashboard UI and Swagger UI. Appeared intermittent — "observing in between".
+Later reported as "now working smooth".
+
+**Initial hypothesis:** PC going to sleep → network drops → phone loses access.
+User selected "PC sleeping" as the state when disconnects happen.
+
+**Investigation:**
+1. `powercfg /a` — PC supports **S3 sleep** (traditional), NOT Modern Standby
+   (S0 Low Power Idle). This matters: S3 suspends CPU + freezes Docker; only
+   Modern Standby keeps network alive in sleep.
+2. `powercfg /getactivescheme` — active plan is **High Performance**
+   (GUID `8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c`).
+3. `powercfg /query SCHEME_CURRENT SUB_SLEEP` — `STANDBYIDLE` (sleep after)
+   is `0x00000000` for **both AC and DC** = **Never**. The PC does not sleep
+   on its own, plugged in or on battery.
+   → The "PC sleeping" hypothesis is wrong; the PC was awake the whole time.
+4. WiFi adapter (Intel AX200) advanced properties already optimal:
+   - Transmit Power: 5. Highest
+   - U-APSD support: Disabled (good — U-APSD causes drops on many routers)
+   - Wake on Magic Packet: Enabled
+   - Wake on Pattern Match: Enabled
+   - MIMO Power Save Mode: Auto SMPS
+   → No WiFi power-saving misconfiguration.
+
+**Root cause (actual):** The disconnects were **the same ECONNREFUSED proxy
+bug** fixed in the previous session (`ad9bfe9`). Every `/api/*` call (login,
+dashboard data, scans, Swagger fetches) was returning HTTP 500 because the
+Next.js proxy was baked with `http://localhost:8000` (unreachable inside the
+container). On the phone this manifested as:
+- Page HTML loads fine (Next.js serves static/cached HTML) → looks "connected"
+- Every API call fails with 500 → dashboard appears dead / "disconnected"
+- Intermittent feel because some static loads succeed while API calls always
+  fail, giving the impression of an unstable connection
+
+After the `ad9bfe9` fix rebuilt the frontend with the correct
+`http://backend:8000` rewrite destination, all API calls succeed → "working
+smooth" as reported by user.
+
+**Why the "PC sleeping" theory was plausible but wrong:** It's a common mental
+model for intermittent network drops, and S3 sleep *would* cause exactly this
+symptom — but the PC's sleep timer is set to Never, so it wasn't the factor.
+
+**Action taken:** None. No power or WiFi settings changed (none needed).
+- PC sleep: already Never (AC + DC) under High Performance plan.
+- WiFi adapter: already optimally configured.
+- App: already fixed in `ad9bfe9`.
+
+**Lesson (reusable):**
+> "Frequent disconnects" on a web app that loads HTML but fails API calls is
+> almost always a proxy/CORS/backend-reachability issue, not a network/sleep
+> issue. The intermittent feel comes from static assets succeeding while
+> dynamic API calls consistently fail. Before chasing power/WiFi settings,
+> check: (1) `docker ps` for container health, (2) browser devtools Network
+> tab for 500s on `/api/*`, (3) `docker logs <frontend>` for ECONNREFUSED.
+> Also: verify the actual sleep timeout with `powercfg /query SCHEME_CURRENT
+> SUB_SLEEP` before assuming sleep is the cause — "High Performance" plans
+> often have sleep set to Never already.
+
+**Diagnostic commands for future reference:**
+```powershell
+# Is the PC actually sleeping? (0 = Never)
+powercfg /query SCHEME_CURRENT SUB_SLEEP   # look for STANDBYIDLE AC/DC index
+powercfg /getactivescheme                   # which plan is active
+powercfg /a                                 # S3 vs Modern Standby (S0)
+
+# Are containers healthy?
+docker ps --format "table {{.Names}}\t{{.Status}}"
+
+# Is the proxy reaching the backend? (look for ECONNREFUSED)
+docker logs scanner-dashboard-frontend-1 --tail 30
+
+# Test API from phone's path (LAN IP)
+Invoke-WebRequest -Uri "http://192.168.1.10:3001/api/health" -UseBasicParsing
+Invoke-WebRequest -Uri "http://192.168.1.10:8000/api/health" -UseBasicParsing  # backend direct
+
+# WiFi adapter power settings
+Get-NetAdapterAdvancedProperty -Name "Wi-Fi" | Where-Object {$_.DisplayName -match "Power|Wake|U-APSD"}
+```
+
+---
+
 ## 2026-08-09 — Phone login broken (ECONNREFUSED in frontend proxy)
 
 **Symptom (reported):** Cannot log in from phone (same WiFi as PC). Works on
