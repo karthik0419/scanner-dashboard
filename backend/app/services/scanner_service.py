@@ -40,12 +40,14 @@ def build_scan_command(
     timeframe: str = "all",
     smart: bool = False,
     test_mode: bool = False,
+    workers: int = 8,
 ) -> list:
     """Build the scanner.py CLI command from parameters."""
     cmd = [sys.executable, "scanner.py",
            "--top", str(top),
            "--min-score", str(min_score),
            "--sl-mode", sl_mode,
+           "--workers", str(workers),
            "--no-notify", "--no-sync"]
 
     if min_price is not None:
@@ -131,11 +133,11 @@ def run_scan_subprocess(
         on_pid(proc.pid)
 
     try:
-        stdout, stderr = proc.communicate(timeout=2400)  # 40 min max (full NSE ~2000 stocks)
+        stdout, stderr = proc.communicate(timeout=3600)  # 60 min max (full NSE ~2000 stocks)
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.communicate()
-        raise RuntimeError("scanner.py timed out after 40 minutes")
+        raise RuntimeError("scanner.py timed out after 60 minutes")
 
     duration = time.time() - start
 
