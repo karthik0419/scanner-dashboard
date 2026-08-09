@@ -121,7 +121,10 @@ export default function DashboardOverview() {
                   <div className="flex items-center gap-3 min-w-0">
                     <Badge variant={scan.status}>{scan.status}</Badge>
                     <div className="min-w-0">
-                      <p className="text-sm text-text-primary truncate">
+                      <p className="text-sm text-text-primary font-semibold truncate">
+                        {scan.scan_name || `Scan ${scan.id.slice(0, 8)}`}
+                      </p>
+                      <p className="text-xs text-text-tertiary truncate mt-0.5">
                         Top {scan.top} · Score ≥ {scan.min_score} · {scan.sl_mode.toUpperCase()}
                         {scan.bearish && <span className="text-danger ml-1">· BEARISH</span>}
                         {scan.test_mode && <span className="text-warning ml-1">· TEST</span>}

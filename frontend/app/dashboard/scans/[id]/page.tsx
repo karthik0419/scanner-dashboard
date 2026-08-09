@@ -143,7 +143,9 @@ export default function ScanDetailPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-text-primary">Scan Detail</h1>
+            <h1 className="text-2xl font-bold text-text-primary">
+              {scan.scan_name || 'Scan Detail'}
+            </h1>
             <Badge variant={scan.status}>{scan.status}</Badge>
           </div>
           <p className="text-sm text-text-tertiary mt-1.5 tabular-nums">

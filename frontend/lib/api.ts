@@ -172,10 +172,11 @@ export interface ScanParams {
   top: number; min_score: number; sl_mode: string;
   min_price?: number; max_price?: number; stocks_file?: string;
   bearish: boolean; timeframe: string; smart: boolean; test_mode: boolean;
+  scan_name?: string;
 }
 
 export interface Scan {
-  id: string; status: string; top: number; min_score: number; sl_mode: string;
+  id: string; status: string; scan_name: string | null; top: number; min_score: number; sl_mode: string;
   min_price: number | null; max_price: number | null; bearish: boolean;
   timeframe: string; total_picks: number; error_message: string | null;
   created_at: string; started_at: string | null; completed_at: string | null;

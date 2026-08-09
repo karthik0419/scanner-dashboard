@@ -45,6 +45,7 @@ class Scan(Base):
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     status = Column(String, default=ScanStatus.queued.value, index=True)  # queued/running/completed/failed/cancelled
     process_pid = Column(Integer, nullable=True)  # subprocess PID for kill/cancel
+    scan_name = Column(String, nullable=True)  # user-defined label for the scan
     # Scan parameters
     top = Column(Integer, default=30)
     min_score = Column(Float, default=50)

@@ -44,10 +44,28 @@ def _ensure_guest_user():
         db.close()
 
 
+def _run_migrations():
+    """Run lightweight inline migrations (add columns to existing tables)."""
+    from sqlalchemy import text, inspect
+    insp = inspect(engine)
+    try:
+        # Add scan_name column to scans table if missing
+        if insp.has_table("scans"):
+            columns = [c["name"] for c in insp.get_columns("scans")]
+            if "scan_name" not in columns:
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE scans ADD COLUMN scan_name VARCHAR(100)"))
+                    conn.commit()
+                print("[migration] Added scan_name column to scans table")
+    except Exception as e:
+        print(f"[migration] Skipped (may already exist): {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Create tables on startup (use Alembic for migrations in production)
     Base.metadata.create_all(bind=engine)
+    _run_migrations()
     _ensure_guest_user()
     yield
 

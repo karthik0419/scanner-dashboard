@@ -94,6 +94,7 @@ export default function ScansPage() {
   const [minPrice, setMinPrice] = useState<number | ''>('');
   const [maxPrice, setMaxPrice] = useState<number | ''>('');
   const [stocksFile, setStocksFile] = useState('');
+  const [scanName, setScanName] = useState('');
 
   const fetchScans = useCallback(() => {
     api.listScans(50).then(setScans).catch((e) => toast.error(e.message)).finally(() => setLoading(false));
@@ -113,7 +114,7 @@ export default function ScansPage() {
   const handlePresetTrigger = async (preset: Preset) => {
     setTriggeringPreset(preset.id);
     try {
-      await api.triggerScan(preset.params);
+      await api.triggerScan({ ...preset.params, scan_name: preset.name });
       toast.success(`${preset.name} scan queued! Check back in 5-15 min.`);
       fetchScans();
     } catch (err: any) {
@@ -132,6 +133,7 @@ export default function ScansPage() {
         ...(minPrice !== '' && { min_price: minPrice }),
         ...(maxPrice !== '' && { max_price: maxPrice }),
         ...(stocksFile && { stocks_file: stocksFile }),
+        ...(scanName.trim() && { scan_name: scanName.trim() }),
       };
       await api.triggerScan(params);
       toast.success('Scan queued! It will take 5-15 minutes.');
@@ -147,7 +149,7 @@ export default function ScansPage() {
   const resetForm = () => {
     setTop(30); setMinScore(50); setSlMode('atr'); setTimeframe('all');
     setBearish(false); setTestMode(false); setSmart(true);
-    setMinPrice(''); setMaxPrice(''); setStocksFile('');
+    setMinPrice(''); setMaxPrice(''); setStocksFile(''); setScanName('');
   };
 
   // Load a preset into the custom form
@@ -156,6 +158,7 @@ export default function ScansPage() {
     setTop(p.top); setMinScore(p.min_score); setSlMode(p.sl_mode); setTimeframe(p.timeframe);
     setBearish(p.bearish); setTestMode(p.test_mode); setSmart(p.smart);
     setMinPrice(p.min_price ?? ''); setMaxPrice(p.max_price ?? ''); setStocksFile(p.stocks_file ?? '');
+    setScanName(preset.name);
     setShowForm(true);
   };
 
@@ -258,6 +261,18 @@ export default function ScansPage() {
             subtitle="Configure and run a custom pattern scan"
           />
           <div className="px-5 pb-5 space-y-5">
+            {/* Scan name */}
+            <div>
+              <Label htmlFor="scanName">Scan name <span className="text-text-tertiary font-normal">(optional — helps you identify this scan in the list)</span></Label>
+              <Input
+                id="scanName"
+                value={scanName}
+                onChange={e => setScanName(e.target.value)}
+                placeholder="e.g. Monday Morning Sweep, Nifty200 Test, Pharma Focus..."
+                maxLength={100}
+              />
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="top">Top N results</Label>
@@ -342,11 +357,11 @@ export default function ScansPage() {
                 <div className="flex items-center gap-4 min-w-0 flex-1">
                   <Badge variant={scan.status}>{scan.status}</Badge>
                   <div className="min-w-0">
-                    <p className="text-sm text-text-secondary truncate">
-                      <span className="text-text-primary font-medium">Top {scan.top}</span>
-                      {' · '}Score ≥ {scan.min_score}
-                      {' · '}{scan.sl_mode.toUpperCase()}
-                      {' · '}{scan.timeframe}
+                    <p className="text-sm text-text-primary font-semibold truncate">
+                      {scan.scan_name || `Scan ${scan.id.slice(0, 8)}`}
+                    </p>
+                    <p className="text-xs text-text-tertiary truncate mt-0.5">
+                      Top {scan.top} · Score ≥ {scan.min_score} · {scan.sl_mode.toUpperCase()} · {scan.timeframe}
                       {scan.bearish && <span className="text-warning ml-1">· BEARISH</span>}
                       {scan.test_mode && <span className="text-info ml-1">· TEST</span>}
                     </p>

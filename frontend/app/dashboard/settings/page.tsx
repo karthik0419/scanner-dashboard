@@ -384,9 +384,9 @@ export default function SettingsPage() {
       <Card>
         <CardHeader
           title="Telegram"
-          subtitle="Receive instant alerts via Telegram"
+          subtitle="Receive scan results and price alerts on your phone"
         />
-        <div className="px-5 pb-5 space-y-4">
+        <div className="px-5 pb-5 space-y-5">
           {/* Connection status */}
           <div className="flex items-center gap-2">
             <span
@@ -404,19 +404,51 @@ export default function SettingsPage() {
             </Badge>
           </div>
 
+          {/* What you get */}
+          <div className="rounded-lg border border-border-subtle bg-bg-elevated p-4">
+            <p className="text-sm font-medium text-text-primary mb-2">What you'll receive:</p>
+            <ul className="text-xs text-text-secondary space-y-1.5 leading-relaxed">
+              <li className="flex items-start gap-2">
+                <span className="text-accent mt-0.5">•</span>
+                <span><span className="font-medium">Scan results</span> — top stock setups (pattern, entry, SL, targets, R:R) after each scan completes</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-accent mt-0.5">•</span>
+                <span><span className="font-medium">Price alerts</span> — instant notification when a stock crosses your target price</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-accent mt-0.5">•</span>
+                <span><span className="font-medium">Pattern breakouts</span> — alerted when a stock breaks out of its pattern</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Chat ID input */}
           <div>
             <Label htmlFor="telegram-chat-id">Telegram Chat ID</Label>
             <Input
               id="telegram-chat-id"
               value={chatId}
               onChange={e => setChatId(e.target.value)}
-              placeholder="e.g. 123456789"
+              placeholder="e.g. 123456789 or -1001234567890"
               aria-label="Telegram chat ID"
             />
-            <p className="text-xs text-text-tertiary mt-2 leading-relaxed">
-              To find your chat ID, message{' '}
-              <span className="font-medium text-text-secondary">@userinfobot</span> on Telegram —
-              it will reply with your numeric chat ID. Paste it above to receive alerts.
+            <div className="mt-3 rounded-lg bg-bg-elevated border border-border-subtle p-3 space-y-2">
+              <p className="text-xs font-medium text-text-secondary">How to find your Chat ID:</p>
+              <ol className="text-xs text-text-tertiary space-y-1.5 leading-relaxed list-decimal list-inside">
+                <li>Open Telegram and search for <span className="font-medium text-text-secondary">@userinfobot</span> (or <span className="font-medium text-text-secondary">@getmyid_bot</span>)</li>
+                <li>Send <span className="font-mono text-text-secondary">/start</span> to the bot</li>
+                <li>It replies with your numeric ID (e.g. <span className="font-mono text-text-secondary">1121884245</span>)</li>
+                <li>For a <span className="font-medium">channel</span>, forward a message to the bot — it returns a negative ID (e.g. <span className="font-mono text-text-secondary">-1004275742331</span>)</li>
+                <li>Paste that ID above and click Save</li>
+              </ol>
+            </div>
+          </div>
+
+          {/* Bot setup info */}
+          <div className="rounded-lg bg-accent-muted/30 border border-accent/20 p-3">
+            <p className="text-xs text-text-secondary leading-relaxed">
+              <span className="font-medium">Note:</span> The bot must be able to message you. For private chats, send <span className="font-mono">/start</span> to the bot first. For channels, add the bot as an admin with posting permissions.
             </p>
           </div>
 

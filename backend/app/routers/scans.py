@@ -28,6 +28,7 @@ async def trigger_scan(
     scan = Scan(
         user_id=user.id,
         status=ScanStatus.queued.value,
+        scan_name=payload.scan_name,
         top=payload.top,
         min_score=payload.min_score,
         sl_mode=payload.sl_mode,

@@ -47,11 +47,13 @@ class ScanTrigger(BaseModel):
     timeframe: str = Field(default="all", pattern="^(all|daily|weekly|monthly)$")
     smart: bool = False
     test_mode: bool = False
+    scan_name: Optional[str] = Field(default=None, max_length=100)
 
 
 class ScanOut(BaseModel):
     id: str
     status: str
+    scan_name: Optional[str]
     top: int
     min_score: float
     sl_mode: str
