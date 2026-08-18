@@ -65,3 +65,5 @@ load_test_results_*.csv
 # ── Scratch / temp files ──
 _smoke_test.py
 COMMIT_MSG.txt
+_doc_commit.txt
+_commit_msg.txt
