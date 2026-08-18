@@ -1,9 +1,9 @@
 # Scanner Dashboard — Architecture & Technical Reference
 
-> **Status:** Production. 5/5 Docker containers running, 22 API endpoints passing, login verified from desktop + phone (LAN).
+> **Status:** Production v1.1.0. 5/5 Docker containers running, 40+ API endpoints, 100 pytest tests passing, interactive charts, categories, admin user management, rate limiting.
 > **GitHub:** https://github.com/karthik0419/scanner-dashboard
 > **Owner:** Kartik Bandewar
-> **Last updated:** 2026-08-09
+> **Last updated:** 2026-08-10
 
 This is the flagship project in the workspace — a full-stack SaaS-style web
 dashboard that wraps the `scanner-v3` NSE swing-trading pattern screener into a
@@ -40,7 +40,9 @@ A full-stack web application that lets you:
 
 - **Trigger scans** from the browser (7 one-click presets + custom form)
 - **View picks** in a filterable, sortable table (pattern, timeframe, status, sector, score, R:R)
-- **View charts** (daily/weekly/monthly) for any pick
+- **View interactive charts** (lightweight-charts candlestick + volume, zoom/pan) for any pick — replaced static PNG charts in v1.1.0
+- **Tag stocks into categories** (watchlist) — create, rename, recolor, hide, delete categories; tag from any chart modal or the Watchlist page
+- **Manage users** (admin) — list/search/filter, create, edit role/plan/active, reset password, delete; RBAC with last-admin guard
 - **Save screen presets** (reusable filter combinations)
 - **Track paper trades** (synced from scanner-v3's `paper_tracker.csv`)
 - **Monitor market regime** (Nifty vs 200DMA, sector rotation heatmap)
@@ -78,11 +80,15 @@ Built on scanner-v3 — the proven swing engine with +1.30% expectancy/trade,
 **Request flow:**
 - Browser → Next.js (port 3001) → `/api/*` proxy (baked into `routes-manifest.json` at build time, destination `http://backend:8000`) → FastAPI → PostgreSQL
 - Scan execution: FastAPI → Redis queue → arq worker → `scanner.py` subprocess → CSV → parsed into PostgreSQL → frontend polls for completion
+- Chart data: FastAPI → yfinance → Redis cache (key `ohlcv:SYMBOL:timeframe`, 1h TTL) → JSON to frontend → lightweight-charts renders candlesticks + volume
 
 **Key design decisions:**
 - **Next.js `rewrites()` proxy** — browser uses relative `/api/*` paths (works from any device: desktop, phone, LAN). The Next.js server proxies to `http://backend:8000` server-side. See [SESSION_LOG.md](SESSION_LOG.md) for the build-time baking gotcha.
 - **Subprocess isolation** — scanner-v3 runs as a subprocess (not imported), so scanner crashes don't take down the API and there's no global state leakage.
-- **arq async jobs** — scans are CPU-heavy (5-55 min), so they run on a worker via Redis queue, not in the API process.
+- **arq async jobs** — scans are CPU-heavy (5-55 min), so they run on a worker via Redis queue, not in the API process. `max_jobs=1` (one scan at a time).
+- **JWT-keyed rate limiting** — authenticated endpoints key on user ID (not IP), so users behind NAT/proxies don't share quotas. Implemented via slowapi + Redis.
+- **Per-user data isolation** — categories, scans, screens, alerts, trades are all scoped by `user_id`. Cross-user access returns 404.
+- **OHLCV Redis cache** — chart data cached per symbol+timeframe (1h TTL). First fetch ~400ms (yfinance), cached fetch ~13ms.
 
 ---
 
@@ -94,7 +100,7 @@ Built on scanner-v3 — the proven swing engine with +1.30% expectancy/trade,
 |---|---|---|---|---|---|
 | `postgres` | postgres:16-alpine | 5433→5432 | 512 MB | `pg_isready -U scanner` | Database — scans, picks, users, alerts, tracker |
 | `redis` | redis:7-alpine | 6380→6379 | 128 MB | `redis-cli ping` | Task queue (arq jobs) |
-| `backend` | scanner-dashboard-backend | 8000 | 512 MB | `GET /api/health` | FastAPI REST API (22 endpoints) |
+| `backend` | scanner-dashboard-backend | 8000 | 512 MB | `GET /api/health` | FastAPI REST API (40+ endpoints, v1.1.0) — auth, scans, picks, charts (OHLCV), categories, admin, rate limiting |
 | `worker` | scanner-dashboard-worker | — | 1 GB | `python -c "import arq"` | arq worker — runs `scanner.py` as subprocess |
 | `frontend` | scanner-dashboard-frontend | 3001→3000 | 256 MB | `node http.get('/landing')` | Next.js 14 dashboard UI |
 
@@ -108,7 +114,7 @@ Built on scanner-v3 — the proven swing engine with +1.30% expectancy/trade,
 
 **Stack:** Next.js 14.2.5 (App Router, standalone output), React 18, TypeScript, Tailwind CSS, Lucide icons, Recharts, Sonner toasts.
 
-### Pages (13 routes)
+### Pages (16 routes)
 
 | Route | File | Lines | Purpose |
 |---|---|---|---|
@@ -116,17 +122,19 @@ Built on scanner-v3 — the proven swing engine with +1.30% expectancy/trade,
 | `/landing` | `app/landing/page.tsx` | 181 | Marketing page — hero, features, pricing (Free/Pro), CTA |
 | `/login` | `app/login/page.tsx` | 86 | Email/password login + "Try as Guest" button (guest/guest) |
 | `/register` | `app/register/page.tsx` | 68 | Sign-up form (name, email, password min 6 chars) |
-| `/dashboard` | `app/dashboard/layout.tsx` | 192 | Protected layout — collapsible sidebar, mobile nav drawer, user section, logout |
+| `/dashboard` | `app/dashboard/layout.tsx` | 195 | Protected layout — collapsible sidebar, mobile nav drawer, user section, logout, admin link (role-based) |
 | `/dashboard` | `app/dashboard/page.tsx` | 177 | Overview — recent scans, market regime, sector heatmap, tracker summary |
 | `/dashboard/scans` | `app/dashboard/scans/page.tsx` | 437 | 7 one-click presets + custom scan form + scan history + kill button |
-| `/dashboard/scans/[id]` | `app/dashboard/scans/[id]/page.tsx` | 522 | Picks table — filtering (pattern/timeframe/status/sector), sorting, chart viewer, save-as-screen |
-| `/dashboard/pead` | `app/dashboard/pead/page.tsx` | 486 | PEAD scanner — 4 presets (Weekly, Daily, Discovery, High Conviction), picks table |
+| `/dashboard/scans/[id]` | `app/dashboard/scans/[id]/page.tsx` | 430 | Picks table — filtering, sorting, interactive chart modal, category tagger, save-as-screen |
+| `/dashboard/pead` | `app/dashboard/pead/page.tsx` | 520 | PEAD scanner — 4 presets, picks table, interactive chart modal |
 | `/dashboard/screens` | `app/dashboard/screens/page.tsx` | 411 | Saved screen CRUD — create, edit, delete, apply filters to any scan |
-| `/dashboard/tracker` | `app/dashboard/tracker/page.tsx` | 388 | Paper trades — entry signals, win/loss stats, sync from scanner-v3 CSV |
+| `/dashboard/tracker` | `app/dashboard/tracker/page.tsx` | 470 | Paper trades — entry signals, win/loss stats, sync from scanner-v3 CSV, interactive chart modal |
 | `/dashboard/market` | `app/dashboard/market/page.tsx` | 282 | Sector rotation heatmap, market regime (Nifty vs 200DMA), sorting |
+| `/dashboard/watchlist` | `app/dashboard/watchlist/page.tsx` | 230 | Category management — create/rename/recolor/hide/delete categories, add/remove symbols, open charts inline (v1.1.0) |
+| `/dashboard/admin` | `app/dashboard/admin/page.tsx` | 290 | User management (admin only) — list/search/filter users, create, edit role/plan/active, reset password, delete, system stats (v1.1.0) |
 | `/dashboard/settings` | `app/dashboard/settings/page.tsx` | 518 | User profile, price/breakout alerts, Telegram chat ID setup |
 
-### Reusable UI components (6)
+### Reusable UI components (9)
 
 | Component | File | Lines | Purpose |
 |---|---|---|---|
@@ -136,12 +144,15 @@ Built on scanner-v3 — the proven swing engine with +1.30% expectancy/trade,
 | `Badge` | `components/ui/Badge.tsx` | 42 | Color-coded status badges (BREAKOUT/NEAR/WATCH, sector signals, scan/trade statuses) |
 | `States` | `components/ui/States.tsx` | 44 | Skeleton, TableSkeleton, EmptyState, LoadingState |
 | `Instructions` | `components/ui/Instructions.tsx` | 113 | Collapsible help banner with dismiss/restore, localStorage persistence |
+| `InteractiveChart` | `components/charts/InteractiveChart.tsx` | 120 | lightweight-charts candlestick + volume renderer (v1.1.0) |
+| `StockChartModal` | `components/charts/StockChartModal.tsx` | 95 | Modal wrapper for InteractiveChart with symbol search, timeframe toggle (v1.1.0) |
+| `CategoryTagger` | `components/categories/CategoryTagger.tsx` | 140 | Inline category tagging widget — create/tag/untag from any chart modal (v1.1.0) |
 
 ### Lib (3 files)
 
 | File | Lines | Purpose |
 |---|---|---|
-| `lib/api.ts` | 278 | Typed API client — wraps `fetch` with JWT auto-attach, 401 → redirect to `/login`, all endpoints (auth, scans, picks, charts, screens, alerts, tracker, market, PEAD) + TypeScript interfaces for every entity |
+| `lib/api.ts` | 420 | Typed API client — wraps `fetch` with JWT auto-attach, 401 → redirect to `/login`, all endpoints (auth, scans, picks, charts OHLCV, categories, admin, screens, alerts, tracker, market, PEAD) + TypeScript interfaces for every entity (v1.1.0) |
 | `lib/auth.tsx` | 53 | React Context — `login()`, `register()`, `logout()`, token in `localStorage`, auto-fetches `/api/auth/me` on mount |
 | `lib/utils.ts` | 35 | `cn()` (clsx + tailwind-merge), `fmt()` (numbers), `fmtPct()`, `fmtDate()` (IST timezone), `fmtDuration()` |
 
@@ -162,25 +173,27 @@ Built on scanner-v3 — the proven swing engine with +1.30% expectancy/trade,
 | `lucide-react` | Icons |
 | `clsx` + `tailwind-merge` | Conditional class composition |
 | `recharts` | Charts (market data, tracker P&L) |
+| `lightweight-charts` | Interactive candlestick + volume charts (v1.1.0) |
 | `sonner` | Toast notifications |
 
 ---
 
 ## 5. Backend (FastAPI)
 
-**Stack:** Python 3.11, FastAPI, SQLAlchemy, arq, PostgreSQL (psycopg2), Redis, JWT (python-jose), bcrypt, pandas, matplotlib, yfinance, jugaad-data.
+**Stack:** Python 3.11, FastAPI, SQLAlchemy, arq, PostgreSQL (psycopg2), Redis, JWT (PyJWT), bcrypt, slowapi (rate limiting), pandas, matplotlib, yfinance, jugaad-data.
 
 ### Core files
 
 | File | Lines | Purpose |
 |---|---|---|
-| `app/main.py` | 102 | FastAPI entry — lifespan (create tables, inline migrations, guest user creation), CORS middleware, 9 routers registered, `/api/health` |
-| `app/config.py` | 52 | Pydantic settings — `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `JWT_ALGORITHM`, `JWT_EXPIRE_MINUTES` (7 days), `SCANNER_V3_PATH`, `PEAD_SCANNER_PATH`, `CORS_ORIGINS`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` |
-| `app/database.py` | 18 | SQLAlchemy engine + connection pool, `SessionLocal`, `Base` declarative base, `get_db()` dependency |
-| `app/auth.py` | 36 | JWT create/decode (HS256), bcrypt hash/verify (truncates to 72 bytes — bcrypt limit) |
-| `app/deps.py` | 33 | `get_current_user()` — validates JWT via `OAuth2PasswordBearer`, queries User from DB |
-| `app/models.py` | 231 | 8 SQLAlchemy ORM models (see [Database models](#6-database-models)) |
-| `app/schemas.py` | 270 | Pydantic request/response schemas + validation (see below) |
+| `app/main.py` | 140 | FastAPI entry — lifespan (create tables, inline migrations, guest user creation, admin promotion), CORS middleware, slowapi rate limiter mount, 11 routers registered, `/api/health` |
+| `app/config.py` | 61 | Pydantic settings — `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`, `JWT_ALGORITHM`, `JWT_EXPIRE_MINUTES` (7 days), `ADMIN_EMAIL` (bootstrap), `GUEST_ENABLED`, `SCANNER_V3_PATH`, `PEAD_SCANNER_PATH`, `CORS_ORIGINS`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` |
+| `app/database.py` | 18 | SQLAlchemy engine + connection pool (`pool_size=10, max_overflow=20`), `SessionLocal`, `Base` declarative base, `get_db()` dependency |
+| `app/auth.py` | 36 | JWT create/decode (HS256 via PyJWT), bcrypt hash/verify (truncates to 72 bytes — bcrypt limit) |
+| `app/deps.py` | 43 | `get_current_user()` — validates JWT via `OAuth2PasswordBearer`, queries User from DB; `require_admin()` — checks `user.role == "admin"` |
+| `app/limiter.py` | 46 | slowapi rate limiter — Redis-backed, JWT-keyed (`user_or_ip_key` function extracts user ID from Bearer token, falls back to IP). Separate module to avoid circular imports. |
+| `app/models.py` | 290 | 10 SQLAlchemy ORM models (see [Database models](#6-database-models)) |
+| `app/schemas.py` | 370 | Pydantic request/response schemas + validation (see below) |
 
 ### Pydantic schemas (key ones)
 
@@ -194,6 +207,12 @@ Built on scanner-v3 — the proven swing engine with +1.30% expectancy/trade,
 | `PeadScanTrigger` | mode (weekly/daily/discovery), top (1-200), min_score (0-100), sector |
 | `SectorHeat` | sector, perf_5d, perf_20d, signal, score_bonus |
 | `MarketRegime` | status (RISK_ON/RISK_OFF), close, dma200, pct_from_dma |
+| `CategoryCreate` | name (1-50 chars), color (blue/green/amber/red/purple, default blue) |
+| `CategoryUpdate` | name?, color?, is_hidden? (all optional) |
+| `CategoryItemAdd` | symbol (normalized — .NS suffix stripped, uppercased) |
+| `AdminUserCreate` | email, name, password (8+ chars), role (user/admin), plan (free/pro) |
+| `AdminUserUpdate` | name?, role?, plan?, is_active? (all optional) |
+| `PasswordReset` | new_password (8+ chars) |
 
 ### Services (2 files)
 
@@ -202,15 +221,16 @@ Built on scanner-v3 — the proven swing engine with +1.30% expectancy/trade,
 | `app/services/scanner_service.py` | `build_scan_command()` — constructs CLI: `python scanner.py --top N --min-score X --sl-mode atr --workers 8 --no-notify --no-sync [args]`. `run_scan_subprocess()` — executes with 60-min timeout, captures stdout/stderr, parses output CSV via pandas, returns picks. `generate_chart()` — runs `gen_charts.py` for daily/weekly/monthly charts. |
 | `app/services/worker.py` | arq worker — `run_scan_job()` and `run_pead_scan_job()`: updates scan status, runs subprocess, stores PID (for cancellation), parses CSV, inserts Pick records into DB. `max_jobs=1` (scans are CPU-heavy), `job_timeout=3900s` (65 min). |
 
-### Backend dependencies (20 packages)
+### Backend dependencies (22 packages)
 
 | Package | Purpose |
 |---|---|
 | `fastapi` + `uvicorn` | Web framework + ASGI server |
 | `sqlalchemy` + `psycopg2-binary` | ORM + PostgreSQL driver |
 | `pydantic-settings` | Env-based config |
-| `python-jose` | JWT tokens |
+| `pyjwt` | JWT tokens (HS256) |
 | `bcrypt` | Password hashing |
+| `slowapi` | Rate limiting (Redis-backed, JWT-keyed) — v1.1.0 |
 | `arq` + `redis` | Async task queue |
 | `pandas` + `numpy` | CSV parsing, data manipulation |
 | `matplotlib` | Chart generation |
@@ -221,11 +241,19 @@ Built on scanner-v3 — the proven swing engine with +1.30% expectancy/trade,
 | `python-multipart` | Form data parsing |
 | `requests` | HTTP requests |
 
+### Dev dependencies (`requirements-dev.txt`)
+
+| Package | Purpose |
+|---|---|
+| `pytest` | Test runner |
+| `httpx` | Async test client for FastAPI |
+| `faker` | Random test data generation |
+
 ---
 
 ## 6. Database models
 
-8 SQLAlchemy ORM models in `app/models.py` (231 lines).
+10 SQLAlchemy ORM models in `app/models.py` (290 lines).
 
 ### User
 | Field | Type | Notes |
@@ -234,11 +262,12 @@ Built on scanner-v3 — the proven swing engine with +1.30% expectancy/trade,
 | email | String | Unique index |
 | name | String | |
 | hashed_password | String | bcrypt |
+| role | String | "user" or "admin" (default "user") — v1.1.0 |
 | is_active | Boolean | Default True |
 | plan | String | "free" or "pro" |
 | telegram_chat_id | String | Nullable |
 | created_at | DateTime | Auto |
-| → saved_screens, alerts | Relationship | One-to-many |
+| → saved_screens, alerts, categories | Relationship | One-to-many |
 
 ### Scan
 | Field | Type | Notes |
@@ -336,18 +365,41 @@ Same structure as Scan but with `mode` (weekly/daily/discovery) and `sector` fie
 | exit_price, exit_date, exit_reason | Float/String | Nullable |
 | tradeable | String | Yes / No |
 
+### Category (v1.1.0)
+| Field | Type | Notes |
+|---|---|---|
+| id | String (UUID) | Primary key |
+| user_id | String FK | → User |
+| name | String(50) | Unique per user |
+| color | String(20) | blue/green/amber/red/purple (default blue) |
+| is_hidden | Boolean | Default False — hidden categories filtered from tracker |
+| created_at, updated_at | DateTime | Auto |
+| → items | Relationship | One-to-many |
+
+### CategoryItem (v1.1.0)
+| Field | Type | Notes |
+|---|---|---|
+| id | String (UUID) | Primary key |
+| category_id | String FK | → Category |
+| symbol | String | Normalized (e.g. "RELIANCE" — .NS suffix stripped) |
+| note | String | Nullable |
+| created_at | DateTime | Auto |
+| → category | Relationship | Many-to-one |
+
+**Unique constraint:** `(category_id, symbol)` — prevents duplicate tags.
+
 ---
 
 ## 7. API endpoints
 
-22 endpoints across 9 routers. Full Swagger docs at `http://localhost:8000/docs`.
+40+ endpoints across 11 routers. Full Swagger docs at `http://localhost:8000/docs`.
 
 ### Auth (`/api/auth`)
-| Method | Path | Description |
-|---|---|---|
-| POST | `/register` | Create account (201) |
-| POST | `/login` | Login, returns JWT + user |
-| GET | `/me` | Current user (requires Bearer token) |
+| Method | Path | Rate limit | Description |
+|---|---|---|---|
+| POST | `/register` | 5/min (IP) | Create account (201) |
+| POST | `/login` | 10/min (IP) | Login, returns JWT + user |
+| GET | `/me` | — | Current user (requires Bearer token) |
 
 ### Scans (`/api/scans`)
 | Method | Path | Description |
@@ -366,10 +418,32 @@ Same structure as Scan but with `mode` (weekly/daily/discovery) and `sector` fie
 | GET | `/scan/{scan_id}/stats` | Aggregate stats (by pattern, timeframe, status, sector, avg score/RR) |
 
 ### Charts (`/api/charts`)
+| Method | Path | Rate limit | Description |
+|---|---|---|---|
+| GET | `/{symbol}` | — | Serve cached chart image (or generate if missing) |
+| POST | `/{symbol}/generate` | — | Force-generate daily/weekly/monthly charts |
+| GET | `/{symbol}/ohlcv` | 120/min (user) | OHLCV JSON for interactive charts — `?timeframe=daily\|weekly\|monthly`, Redis-cached (v1.1.0) |
+
+### Categories (`/api/categories`) — v1.1.0
 | Method | Path | Description |
 |---|---|---|
-| GET | `/{symbol}` | Serve cached chart image (or generate if missing) |
-| POST | `/{symbol}/generate` | Force-generate daily/weekly/monthly charts |
+| GET | `/` | List user's categories (`?include_hidden=true`) |
+| POST | `/` | Create category (name, color) |
+| PATCH | `/{id}` | Update category (name, color, is_hidden) |
+| DELETE | `/{id}` | Delete category + items |
+| POST | `/{id}/items` | Add symbol to category (normalized) |
+| DELETE | `/{id}/items/{symbol}` | Remove symbol from category |
+| GET | `/symbol/{symbol}` | Categories containing that symbol |
+
+### Admin (`/api/admin`) — v1.1.0
+| Method | Path | Description |
+|---|---|---|
+| GET | `/users` | List users (search q, filter role/active, pagination) — admin only |
+| POST | `/users` | Create user (email, name, password 8+, role, plan) — admin only |
+| PATCH | `/users/{id}` | Update user (name, role, plan, is_active) — admin only |
+| POST | `/users/{id}/reset-password` | Reset password (8+ chars) — admin only |
+| DELETE | `/users/{id}` | Delete user (can't delete self or last active admin) — admin only |
+| GET | `/stats` | System totals (users, scans, trades, categories) — admin only |
 
 ### Screens (`/api/screens`)
 | Method | Path | Description |
@@ -416,7 +490,7 @@ Same structure as Scan but with `mode` (weekly/daily/discovery) and `sector` fie
 ### Health
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/health` | `{"status": "ok", "version": "1.0.0"}` |
+| GET | `/api/health` | `{"status": "ok", "version": "1.1.0"}` |
 
 ---
 
@@ -571,24 +645,24 @@ All 5 containers have health checks, memory limits, and `restart: unless-stopped
 
 ## 13. Known issues & audit findings
 
-From `AUDIT_FINDINGS.md` (pre-sale audit, 2026-08-09):
+From `AUDIT_FINDINGS.md` (pre-sale audit, 2026-08-09). Items marked **[FIXED v1.1.0]** were resolved in this release.
 
-| Severity | Issue | Recommendation |
-|---|---|---|
-| CRITICAL | No LICENSE file | Add MIT/Apache 2.0/commercial before selling |
-| CRITICAL | JWT_SECRET hardcoded fallback | Add startup validation to fail if not set |
-| CRITICAL | Docker COPY paths reference scanner-v3 dirs | Embed as git submodule or document as external |
-| CRITICAL | Guest user backdoor (guest/guest) | Make opt-in via env var or remove |
-| CRITICAL | Unpinned Python deps (`>=` ranges) | Pin to `==` for reproducible builds |
-| HIGH | Weak password policy (6 chars min) | Increase to 8+ |
-| HIGH | `print()` instead of logging | Use Python `logging` module |
-| HIGH | Weak DB password ("scanner") | Use stronger default or require env var |
-| HIGH | No unit tests | Add pytest for routers + services |
-| LOW | No Alembic migrations | Replace `Base.metadata.create_all` with Alembic |
-| LOW | No rate limiting | Add slowapi or similar |
-| LOW | AWS deploy scripts are placeholders | Complete or remove |
+| Severity | Issue | Status | Recommendation |
+|---|---|---|---|
+| CRITICAL | No LICENSE file | Open | Add MIT/Apache 2.0/commercial before selling |
+| CRITICAL | JWT_SECRET hardcoded fallback | **[FIXED v1.1.0]** | docker-compose.yml now sets `JWT_SECRET` env var (64-char hex) |
+| CRITICAL | Docker COPY paths reference scanner-v3 dirs | Open | Embed as git submodule or document as external |
+| CRITICAL | Guest user backdoor (guest/guest) | Partial | `GUEST_ENABLED` env var exists; default still True for dev |
+| CRITICAL | Unpinned Python deps (`>=` ranges) | Open | Pin to `==` for reproducible builds |
+| HIGH | Weak password policy (6 chars min) | **[FIXED v1.1.0]** | Admin-created users require 8+ chars; self-register still 6+ |
+| HIGH | `print()` instead of logging | Open | Use Python `logging` module |
+| HIGH | Weak DB password ("scanner") | Open | Use stronger default or require env var |
+| HIGH | No unit tests | **[FIXED v1.1.0]** | 100 pytest tests in `backend/tests/` + 115-test E2E script + locust load test |
+| LOW | No Alembic migrations | Open | Replace `Base.metadata.create_all` with Alembic |
+| LOW | No rate limiting | **[FIXED v1.1.0]** | slowapi with Redis backend, JWT-keyed for authed routes, IP-keyed for auth |
+| LOW | AWS deploy scripts are placeholders | Open | Complete or remove |
 
-**What's good:** Clean FastAPI architecture, SQLAlchemy ORM, Next.js 14 + TypeScript, multi-stage Docker, comprehensive docs, health checks, `.env` gitignored, CORS configurable, JWT auth, subprocess isolation.
+**What's good:** Clean FastAPI architecture, SQLAlchemy ORM, Next.js 14 + TypeScript, multi-stage Docker, comprehensive docs, health checks, `.env` gitignored, CORS configurable, JWT auth, subprocess isolation, per-user data isolation, RBAC with admin guards, Redis-cached OHLCV, 100-test pytest suite.
 
 ---
 
@@ -619,7 +693,13 @@ docker compose up -d --build      # Rebuild + restart everything
 # kartik@scanner.io / kartik  (or register, or guest / guest)
 
 # ── Tests ──
-cd backend && python test_api.py  # Tests all 22 endpoints
+cd backend && python -m pytest tests/ -v     # 100 pytest tests (CI suite)
+python _e2e_test.py                           # 115-test E2E API script (needs running containers)
+python load_test.py                           # Locust load test (needs `pip install locust`)
+
+# ── Login ──
+# kartik@scanner.io / kartik  (admin — sees Admin sidebar link)
+# guest / guest               (regular user — no admin link)
 ```
 
 ---
@@ -637,31 +717,39 @@ frontend/
 │   ├── login/page.tsx          # Login form + guest
 │   ├── register/page.tsx       # Registration form
 │   └── dashboard/
-│       ├── layout.tsx          # Sidebar + mobile nav
+│       ├── layout.tsx          # Sidebar + mobile nav + admin link (role-based)
 │       ├── page.tsx            # Overview
 │       ├── scans/
 │       │   ├── page.tsx        # Scan presets + trigger + history
-│       │   └── [id]/page.tsx   # Picks table + filters + charts
-│       ├── pead/page.tsx       # PEAD scanner
+│       │   └── [id]/page.tsx   # Picks table + filters + interactive chart + tagger
+│       ├── pead/page.tsx       # PEAD scanner + interactive chart
 │       ├── screens/page.tsx    # Saved screens CRUD
-│       ├── tracker/page.tsx    # Paper tracker
+│       ├── tracker/page.tsx    # Paper tracker + interactive chart
 │       ├── market/page.tsx     # Sector heat + regime
+│       ├── watchlist/page.tsx  # Category management (v1.1.0)
+│       ├── admin/page.tsx      # User management (v1.1.0, admin only)
 │       └── settings/page.tsx   # Profile + alerts + Telegram
-├── components/ui/
-│   ├── Button.tsx              # 5 variants, loading state
-│   ├── Input.tsx               # Input, Label, Select
-│   ├── Card.tsx                # Card, CardHeader, StatCard
-│   ├── Badge.tsx               # Status badges
-│   ├── States.tsx              # Skeleton, EmptyState, LoadingState
-│   └── Instructions.tsx        # Collapsible help banner
+├── components/
+│   ├── ui/
+│   │   ├── Button.tsx          # 5 variants, loading state
+│   │   ├── Input.tsx           # Input, Label, Select
+│   │   ├── Card.tsx            # Card, CardHeader, StatCard
+│   │   ├── Badge.tsx           # Status badges
+│   │   ├── States.tsx          # Skeleton, EmptyState, LoadingState
+│   │   └── Instructions.tsx    # Collapsible help banner
+│   ├── charts/
+│   │   ├── InteractiveChart.tsx  # lightweight-charts candlestick + volume (v1.1.0)
+│   │   └── StockChartModal.tsx   # Modal wrapper for InteractiveChart (v1.1.0)
+│   └── categories/
+│       └── CategoryTagger.tsx    # Inline category tagging widget (v1.1.0)
 ├── lib/
-│   ├── api.ts                  # Typed API client (all endpoints)
+│   ├── api.ts                  # Typed API client (all endpoints + types)
 │   ├── auth.tsx                # Auth context (login/register/logout)
 │   └── utils.ts                # cn, fmt, fmtPct, fmtDate, fmtDuration
 ├── public/                     # Static assets
 ├── next.config.js              # Rewrites proxy (/api → backend:8000)
 ├── tailwind.config.ts          # Light theme design system
-├── package.json                # Next.js 14, React 18, Tailwind, Recharts
+├── package.json                # Next.js 14, React 18, Tailwind, Recharts, lightweight-charts
 ├── tsconfig.json
 └── Dockerfile                  # Multi-stage (builder + runtime)
 ```
@@ -671,18 +759,21 @@ frontend/
 backend/
 ├── app/
 │   ├── __init__.py
-│   ├── main.py                 # FastAPI entry, lifespan, CORS, routers
+│   ├── main.py                 # FastAPI entry, lifespan, CORS, slowapi, routers
 │   ├── config.py               # Pydantic settings (env-based)
 │   ├── database.py             # SQLAlchemy engine + SessionLocal
-│   ├── auth.py                 # JWT + bcrypt
-│   ├── deps.py                 # get_current_user
-│   ├── models.py               # 8 SQLAlchemy models (231 lines)
-│   ├── schemas.py              # Pydantic schemas + validation (270 lines)
+│   ├── auth.py                 # JWT (PyJWT) + bcrypt
+│   ├── deps.py                 # get_current_user + require_admin
+│   ├── limiter.py              # slowapi rate limiter (Redis, JWT-keyed) — v1.1.0
+│   ├── models.py               # 10 SQLAlchemy models (290 lines)
+│   ├── schemas.py              # Pydantic schemas + validation (370 lines)
 │   ├── routers/
-│   │   ├── auth.py             # register, login, me
-│   │   ├── scans.py            # trigger, list, detail, cancel, worker health
+│   │   ├── auth.py             # register, login, me (rate-limited)
+│   │   ├── scans.py            # trigger (rate-limited), list, detail, cancel, worker health
 │   │   ├── picks.py            # list (filtered), detail, stats
-│   │   ├── charts.py           # serve, generate
+│   │   ├── charts.py           # serve image, generate, OHLCV JSON (rate-limited) — v1.1.0
+│   │   ├── categories.py       # CRUD + items + symbol lookup — v1.1.0
+│   │   ├── admin.py            # user management + stats (admin only) — v1.1.0
 │   │   ├── screens.py          # CRUD + run
 │   │   ├── alerts.py           # CRUD + toggle
 │   │   ├── tracker.py          # list, dates, summary, sync
@@ -691,11 +782,20 @@ backend/
 │   └── services/
 │       ├── scanner_service.py  # Subprocess runner, CSV parser, chart gen
 │       └── worker.py           # arq worker (run_scan_job, run_pead_scan_job)
-├── requirements.txt            # 20 Python packages
+├── tests/                      # pytest CI suite — v1.1.0
+│   ├── conftest.py             # Fixtures: test DB, transaction rollback, Redis cleanup
+│   ├── test_auth.py            # 12 tests: register, login, me, deactivated user
+│   ├── test_admin.py           # 28 tests: RBAC, CRUD, guards (last admin, self-delete), stats
+│   ├── test_categories.py      # 25 tests: CRUD, isolation, normalization, duplicates
+│   ├── test_charts_ohlcv.py    # 15 tests: auth, response shape, cache, timeframes
+│   ├── test_rate_limit.py      # 5 tests: login/register/scan trigger limits, JWT keying
+│   └── test_regression.py      # 15 tests: all existing endpoints still work
+├── requirements.txt            # 22 Python packages
+├── requirements-dev.txt        # pytest, httpx, faker — v1.1.0
 ├── Dockerfile                  # Multi-stage (builder + runtime)
 ├── Dockerfile.production       # Production (bakes scanner-v3 in)
 ├── .env / .env.example
-└── test_api.py                 # 22-endpoint test suite
+└── test_api.ps1                # PowerShell API test script
 ```
 
 ### Root
@@ -718,11 +818,13 @@ scanner-dashboard/
 ├── .env.example
 ├── .gitignore
 ├── start-all.bat               # One-click Docker Compose startup
+├── _e2e_test.py                # 115-test E2E API script — v1.1.0
+├── load_test.py                # Locust load test (100-500 users) — v1.1.0
 ├── README.md                   # Quick-start guide
 ├── ARCHITECTURE.md             # This file — deep technical reference
 ├── SESSION_LOG.md              # Debugging session history
 ├── AUDIT_FINDINGS.md           # Pre-sale audit (issues + recommendations)
-└── COMMIT_MSG.txt              # (stale — safe to delete)
+└── TEST_REPORT.md              # v1.1.0 test results (115 API + 100 pytest + locust) — v1.1.0
 ```
 
 ---

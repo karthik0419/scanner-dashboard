@@ -5,6 +5,115 @@ Append newest entries to the top.
 
 ---
 
+## 2026-08-10 — v1.1.0: Interactive charts, categories, admin, rate limiting, tests
+
+**Goal:** Add 5 new features for multi-user readiness: interactive charts,
+category/tagging system, admin user management, rate limiting, and a full
+test suite.
+
+### Features built
+
+1. **Interactive charts (lightweight-charts)**
+   - Replaced static PNG chart viewer with candlestick + volume chart
+   - New `GET /api/charts/{symbol}/ohlcv?timeframe=daily|weekly|monthly` endpoint
+   - Redis-cached (key `ohlcv:SYMBOL:timeframe`, 1h TTL): first fetch ~400ms, cached ~13ms
+   - `InteractiveChart.tsx` (candlestick renderer) + `StockChartModal.tsx` (modal wrapper)
+   - Wired into scans detail, tracker, and PEAD pages
+
+2. **Category/tagging system**
+   - `Category` + `CategoryItem` models (per-user, unique name per user)
+   - Full CRUD: create, rename, recolor, hide, delete categories
+   - Add/remove symbols (normalized — `.NS` suffix stripped, uppercased)
+   - `CategoryTagger.tsx` component embedded in chart modal — tag from anywhere
+   - New `/dashboard/watchlist` page for category management
+   - Per-user isolation: cross-user access returns 404
+
+3. **Admin user management**
+   - `role` column on User model ("user" / "admin")
+   - `GET /api/admin/users` (search, filter by role/active, pagination)
+   - `POST /api/admin/users` (create with 8+ char password)
+   - `PATCH /api/admin/users/{id}` (edit role/plan/active)
+   - `POST /api/admin/users/{id}/reset-password`
+   - `DELETE /api/admin/users/{id}` (can't delete self or last active admin)
+   - `GET /api/admin/stats` (system totals)
+   - `require_admin` dependency — 403 for non-admins
+   - New `/dashboard/admin` page (sidebar link visible only to admin role)
+   - Admin bootstrap: `ADMIN_EMAIL` env var promotes user on startup
+
+4. **Rate limiting (slowapi)**
+   - Redis-backed, JWT-keyed (`user_or_ip_key` extracts user ID from Bearer token)
+   - Login: 10/min (IP), Register: 5/min (IP), Scan trigger: 10/hour (user), OHLCV: 120/min (user)
+   - `limiter.py` separate module to avoid circular imports
+
+5. **Test suite**
+   - 115-test E2E API script (`_e2e_test.py`) — all features + edge cases
+   - 100-test pytest CI suite (`backend/tests/`) — test DB, transaction rollback
+   - Locust load test (`load_test.py`) — 190 requests, p95 < 60ms, cached OHLCV 13ms
+   - `TEST_REPORT.md` with full results
+
+### Bugs found and fixed
+
+- **TypeScript build error** — `InstructionsBanner` variant `"indigo"` not in
+  allowed union (`"blue" | "green" | "amber"`). Fixed: changed to `"blue"` in
+  `watchlist/page.tsx`.
+- **Smoke test JSON parse** — `urllib.error.HTTPError.read()` consumed body
+  before `json.loads` could parse it. Fixed: read body once into variable.
+
+### Docker rebuilds
+
+- Backend + worker: `--no-cache` rebuild to pick up `slowapi` in requirements.txt
+- Frontend: `--no-cache` rebuild to pick up `lightweight-charts` in package.json
+- All 5 containers healthy after rebuild
+
+### Test results
+
+| Suite | Result |
+|---|---|
+| E2E API (`_e2e_test.py`) | 115/115 passed |
+| Pytest CI (`backend/tests/`) | 100/100 passed |
+| Locust load test | 190 requests, 0 failures, p95 < 60ms |
+| Frontend build | 16/16 pages compiled |
+
+### Files changed (37 files, +4611 lines)
+
+**Backend (new):** `limiter.py`, `routers/admin.py`, `routers/categories.py`,
+`requirements-dev.txt`, `tests/` (7 files)
+**Backend (modified):** `config.py`, `deps.py`, `main.py`, `models.py`,
+`routers/auth.py`, `routers/charts.py`, `routers/scans.py`, `schemas.py`,
+`requirements.txt`
+**Frontend (new):** `app/dashboard/watchlist/page.tsx`, `app/dashboard/admin/page.tsx`,
+`components/charts/InteractiveChart.tsx`, `components/charts/StockChartModal.tsx`,
+`components/categories/CategoryTagger.tsx`
+**Frontend (modified):** `app/dashboard/layout.tsx`, `app/dashboard/pead/page.tsx`,
+`app/dashboard/scans/[id]/page.tsx`, `app/dashboard/tracker/page.tsx`, `lib/api.ts`,
+`package.json`, `package-lock.json`
+**Root (new):** `_e2e_test.py`, `load_test.py`, `TEST_REPORT.md`
+**Root (modified):** `.gitignore`
+
+### Commit
+
+`42ff620` — "Add interactive charts, categories, admin user management, rate
+limiting, and test suite (v1.1.0)" — pushed to origin/master.
+
+### Capacity analysis
+
+Current config handles ~50-100 concurrent active users (DB pool = 30 connections).
+500+ concurrent idle users (logged in, not clicking) are fine. To scale to 500+
+active: (1) `uvicorn --workers 4`, (2) `pool_size=20, max_overflow=40`, (3) Postgres
+1GB memory. Scan triggers are queued (`max_jobs=1`) — one scan at a time, 15-55 min
+each. Multiple users can trigger but they run sequentially.
+
+### Lesson (reusable)
+
+> When adding rate limiting to a FastAPI app with JWT auth, key the limiter by
+> user ID (from the Bearer token), not IP. Users behind corporate NAT/proxies
+> share IPs — IP-keyed limits would throttle legitimate users. The `user_or_ip_key`
+> pattern (try JWT first, fall back to IP for unauthenticated routes like login)
+> is the right approach. Put the limiter in a separate module to avoid circular
+> imports between `main.py` and routers.
+
+---
+
 ## 2026-08-09 — "Frequent disconnects" on phone (dashboard + Swagger UI)
 
 **Symptom (reported):** Frequent disconnections observed on the phone for both
