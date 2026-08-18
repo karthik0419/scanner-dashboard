@@ -82,6 +82,9 @@ export const api = {
     const base = API_BASE || '';
     return `${base}/api/charts/${symbol}?timeframe=${timeframe}`;
   },
+  getOhlcv(symbol: string, timeframe: string) {
+    return request<OhlcvResponse>(`/api/charts/${encodeURIComponent(symbol)}/ohlcv?timeframe=${timeframe}`);
+  },
 
   // ── Saved Screens ───────────────────────────────────────────────────
   listScreens() {
@@ -160,12 +163,101 @@ export const api = {
     const qs = new URLSearchParams(filters as any).toString();
     return request<PeadPicksResponse>(`/api/pead/${scanId}/picks?${qs}`);
   },
+
+  // ── Categories ──────────────────────────────────────────────────────
+  listCategories(includeHidden = true) {
+    return request<Category[]>(`/api/categories?include_hidden=${includeHidden}`);
+  },
+  createCategory(name: string, color = 'indigo') {
+    return request<Category>('/api/categories', {
+      method: 'POST', body: JSON.stringify({ name, color }),
+    });
+  },
+  updateCategory(id: string, updates: { name?: string; color?: string; is_hidden?: boolean }) {
+    return request<Category>(`/api/categories/${id}`, {
+      method: 'PATCH', body: JSON.stringify(updates),
+    });
+  },
+  deleteCategory(id: string) {
+    return request<{ message: string }>(`/api/categories/${id}`, { method: 'DELETE' });
+  },
+  addToCategory(categoryId: string, symbol: string, note?: string) {
+    return request<CategoryItem>(`/api/categories/${categoryId}/items`, {
+      method: 'POST', body: JSON.stringify({ symbol, note }),
+    });
+  },
+  removeFromCategory(categoryId: string, symbol: string) {
+    return request<{ message: string }>(`/api/categories/${categoryId}/items/${encodeURIComponent(symbol)}`, {
+      method: 'DELETE',
+    });
+  },
+  categoriesForSymbol(symbol: string) {
+    return request<Category[]>(`/api/categories/symbol/${encodeURIComponent(symbol)}`);
+  },
+
+  // ── Admin ───────────────────────────────────────────────────────────
+  adminListUsers(params: { q?: string; role?: string; active?: boolean; limit?: number; offset?: number } = {}) {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]))
+    ).toString();
+    return request<AdminUser[]>(`/api/admin/users${qs ? '?' + qs : ''}`);
+  },
+  adminCreateUser(payload: { email: string; name: string; password: string; role?: string; plan?: string }) {
+    return request<AdminUser>('/api/admin/users', {
+      method: 'POST', body: JSON.stringify(payload),
+    });
+  },
+  adminUpdateUser(id: string, updates: { name?: string; role?: string; plan?: string; is_active?: boolean }) {
+    return request<AdminUser>(`/api/admin/users/${id}`, {
+      method: 'PATCH', body: JSON.stringify(updates),
+    });
+  },
+  adminResetPassword(id: string, newPassword: string) {
+    return request<{ message: string }>(`/api/admin/users/${id}/reset-password`, {
+      method: 'POST', body: JSON.stringify({ new_password: newPassword }),
+    });
+  },
+  adminDeleteUser(id: string) {
+    return request<{ message: string }>(`/api/admin/users/${id}`, { method: 'DELETE' });
+  },
+  adminStats() {
+    return request<AdminStats>('/api/admin/stats');
+  },
 };
 
 // ── Types ─────────────────────────────────────────────────────────────
 export interface User {
-  id: string; email: string; name: string; plan: string;
+  id: string; email: string; name: string; role: string; plan: string;
   telegram_chat_id: string | null; created_at: string;
+}
+
+export interface OhlcvBar {
+  time: string; open: number; high: number; low: number; close: number; volume: number;
+}
+
+export interface OhlcvResponse {
+  symbol: string; timeframe: string; period: string; bars: OhlcvBar[];
+}
+
+export interface CategoryItem {
+  id: string; symbol: string; note: string | null; created_at: string;
+}
+
+export interface Category {
+  id: string; name: string; color: string; is_hidden: boolean;
+  created_at: string; items: CategoryItem[];
+}
+
+export interface AdminUser {
+  id: string; email: string; name: string; role: string; plan: string;
+  is_active: boolean; telegram_chat_id: string | null; created_at: string;
+  scan_count: number; trade_count: number;
+}
+
+export interface AdminStats {
+  total_users: number; active_users: number; admin_users: number;
+  total_scans: number; scans_last_7d: number; total_picks: number;
+  total_trades: number; total_categories: number;
 }
 
 export interface ScanParams {

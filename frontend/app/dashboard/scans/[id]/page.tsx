@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Label, Select } from '@/components/ui/Input';
 import { TableSkeleton, EmptyState, LoadingState } from '@/components/ui/States';
+import { StockChartModal } from '@/components/charts/StockChartModal';
 import { fmt, fmtPct, fmtDate, fmtDuration, cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -385,12 +386,31 @@ export default function ScanDetailPage() {
         </>
       )}
 
-      {/* Chart modal */}
+      {/* Interactive chart modal */}
       {chartPick && (
-        <ChartModal
-          pick={chartPick}
-          timeframe={chartTimeframe}
-          onTimeframeChange={setChartTimeframe}
+        <StockChartModal
+          symbol={chartPick.symbol}
+          title={`${chartPick.symbol.replace('.NS', '')} · ${chartPick.pattern}`}
+          subtitle={`${chartPick.timeframe} · ${chartPick.status} · CMP ${fmt(chartPick.cmp)}`}
+          initialTimeframe={chartTimeframe}
+          levels={[
+            { price: chartPick.breakout, label: 'Breakout', color: '#6366f1' },
+            { price: chartPick.stop_loss, label: 'SL', color: '#dc2626', style: 'dashed' },
+            { price: chartPick.target_1, label: 'T1', color: '#16a34a', style: 'dashed' },
+            { price: chartPick.target_2, label: 'T2', color: '#15803d', style: 'dashed' },
+          ]}
+          details={
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+              <DetailItem label="Breakout" value={fmt(chartPick.breakout)} />
+              <DetailItem label="Stop Loss" value={fmt(chartPick.stop_loss)} danger />
+              <DetailItem label="Target 1" value={fmt(chartPick.target_1)} success />
+              <DetailItem label="Target 2" value={fmt(chartPick.target_2)} success />
+              <DetailItem label="R:R" value={fmt(chartPick.rr)} />
+              <DetailItem label="Score" value={fmt(chartPick.score, 0)} />
+              <DetailItem label="Upside" value={fmtPct(chartPick.upside_pct)} success />
+              <DetailItem label="Sector" value={chartPick.sector || '—'} />
+            </div>
+          }
           onClose={() => setChartPick(null)}
         />
       )}
@@ -420,91 +440,6 @@ function ScoreBar({ score }: { score: number | null | undefined }) {
         <div className={cn('h-full rounded-full transition-all duration-300', color)} style={{ width: `${s}%` }} />
       </div>
       <span className={cn('font-bold tabular-nums w-8 text-right', textColor)}>{Math.round(s)}</span>
-    </div>
-  );
-}
-
-function ChartModal({ pick, timeframe, onTimeframeChange, onClose }: {
-  pick: Pick; timeframe: string; onTimeframeChange: (tf: string) => void; onClose: () => void;
-}) {
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 animate-fade-in"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`${pick.symbol} chart viewer`}
-    >
-      <div
-        className="w-full max-w-4xl max-h-[90vh] overflow-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Card className="animate-slide-up">
-          <CardHeader
-            title={`${pick.symbol} · ${pick.pattern}`}
-            subtitle={`${pick.timeframe} · ${pick.status} · CMP ${fmt(pick.cmp)}`}
-            action={
-              <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close chart">
-                <X className="h-4 w-4" />
-              </Button>
-            }
-          />
-          <div className="px-5 pb-5 space-y-4">
-            {/* Timeframe switcher */}
-            <div className="flex gap-2">
-              {['daily', 'weekly', 'monthly'].map(tf => (
-                <Button
-                  key={tf}
-                  variant={timeframe === tf ? 'primary' : 'outline'}
-                  size="sm"
-                  onClick={() => onTimeframeChange(tf)}
-                  aria-pressed={timeframe === tf}
-                >
-                  {tf.charAt(0).toUpperCase() + tf.slice(1)}
-                </Button>
-              ))}
-            </div>
-            {/* Chart image */}
-            <div className="flex justify-center bg-bg rounded-lg p-4 min-h-[300px] items-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={api.chartUrl(pick.symbol, timeframe)}
-                alt={`${pick.symbol} ${timeframe} chart`}
-                className="max-w-full rounded-lg"
-                onError={(e) => {
-                  const img = e.target as HTMLImageElement;
-                  img.style.display = 'none';
-                  const parent = img.parentElement;
-                  if (parent && !parent.querySelector('.chart-error')) {
-                    const msg = document.createElement('p');
-                    msg.className = 'chart-error text-sm text-text-tertiary';
-                    msg.textContent = 'Chart not available for this symbol.';
-                    parent.appendChild(msg);
-                  }
-                }}
-              />
-            </div>
-            {/* Pick details */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-              <DetailItem label="Breakout" value={fmt(pick.breakout)} />
-              <DetailItem label="Stop Loss" value={fmt(pick.stop_loss)} danger />
-              <DetailItem label="Target 1" value={fmt(pick.target_1)} success />
-              <DetailItem label="Target 2" value={fmt(pick.target_2)} success />
-              <DetailItem label="R:R" value={fmt(pick.rr)} />
-              <DetailItem label="Score" value={fmt(pick.score, 0)} />
-              <DetailItem label="Upside" value={fmtPct(pick.upside_pct)} success />
-              <DetailItem label="Sector" value={pick.sector || '—'} />
-            </div>
-          </div>
-        </Card>
-      </div>
     </div>
   );
 }

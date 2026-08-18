@@ -31,3 +31,13 @@ def get_current_user(
     if user is None or not user.is_active:
         raise credentials_exc
     return user
+
+
+def require_admin(user: User = Depends(get_current_user)) -> User:
+    """Dependency — requires the current user to have the admin role."""
+    if user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return user

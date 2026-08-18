@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input, Label, Select } from '@/components/ui/Input';
 import { TableSkeleton, EmptyState } from '@/components/ui/States';
+import { StockChartModal } from '@/components/charts/StockChartModal';
 import { fmtDate, fmtDuration, cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -389,6 +390,7 @@ function ScanStatusBadge({ status }: { status: string }) {
 function PicksTable({ picks }: { picks: PeadPick[] }) {
   const [sortBy, setSortBy] = useState<'score' | 'rr' | 'avg_spike_pct' | 'proj_yoy_growth'>('score');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [chartPick, setChartPick] = useState<PeadPick | null>(null);
 
   const filtered = picks
     .filter(p => !statusFilter || p.status === statusFilter)
@@ -436,9 +438,19 @@ function PicksTable({ picks }: { picks: PeadPick[] }) {
           </thead>
           <tbody className="divide-y divide-border bg-white">
             {filtered.map(pick => (
-              <tr key={pick.id} className="hover:bg-bg-hover/50">
+              <tr
+                key={pick.id}
+                className="hover:bg-bg-hover/50 cursor-pointer"
+                onClick={() => setChartPick(pick)}
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter') setChartPick(pick); }}
+                aria-label={`Open ${pick.symbol} chart`}
+              >
                 <td className="px-3 py-2 font-medium text-text-primary">
-                  {pick.symbol}
+                  <span className="inline-flex items-center gap-1.5">
+                    {pick.symbol}
+                    <BarChart3 className="h-3 w-3 text-text-tertiary" />
+                  </span>
                   {pick.sector && (
                     <span className="block text-[10px] text-text-tertiary">{pick.sector}</span>
                   )}
@@ -481,6 +493,21 @@ function PicksTable({ picks }: { picks: PeadPick[] }) {
           </tbody>
         </table>
       </div>
+
+      {/* Interactive chart modal */}
+      {chartPick && (
+        <StockChartModal
+          symbol={chartPick.symbol}
+          title={chartPick.symbol.replace('.NS', '')}
+          subtitle={`PEAD · ${chartPick.status}${chartPick.sector ? ' · ' + chartPick.sector : ''} · CMP ${chartPick.cmp?.toFixed(2)}`}
+          levels={[
+            { price: chartPick.entry, label: 'Entry', color: '#6366f1' },
+            { price: chartPick.stop, label: 'Stop', color: '#dc2626', style: 'dashed' },
+            { price: chartPick.target, label: 'Target', color: '#16a34a', style: 'dashed' },
+          ]}
+          onClose={() => setChartPick(null)}
+        />
+      )}
     </div>
   );
 }

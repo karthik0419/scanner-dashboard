@@ -21,6 +21,7 @@ class UserOut(BaseModel):
     id: str
     email: str
     name: str
+    role: str = "user"
     plan: str
     telegram_chat_id: Optional[str]
     created_at: datetime
@@ -210,6 +211,109 @@ class PaginatedResponse(BaseModel):
     limit: int
     offset: int
     items: List[Any]
+
+
+# ── Admin (user management) ───────────────────────────────────────────
+class AdminUserOut(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str
+    plan: str
+    is_active: bool
+    telegram_chat_id: Optional[str]
+    created_at: datetime
+    scan_count: int = 0
+    trade_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    name: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=8, max_length=128)
+    role: str = Field(default="user", pattern="^(user|admin)$")
+    plan: str = Field(default="free", pattern="^(free|pro)$")
+
+
+class AdminUserUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    role: Optional[str] = Field(default=None, pattern="^(user|admin)$")
+    plan: Optional[str] = Field(default=None, pattern="^(free|pro)$")
+    is_active: Optional[bool] = None
+
+
+class AdminPasswordReset(BaseModel):
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class AdminStats(BaseModel):
+    total_users: int
+    active_users: int
+    admin_users: int
+    total_scans: int
+    scans_last_7d: int
+    total_picks: int
+    total_trades: int
+    total_categories: int
+
+
+# ── Categories ────────────────────────────────────────────────────────
+class CategoryCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=50)
+    color: str = Field(default="indigo", pattern="^(indigo|green|red|amber|blue|purple|pink|gray)$")
+
+
+class CategoryUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    color: Optional[str] = Field(default=None, pattern="^(indigo|green|red|amber|blue|purple|pink|gray)$")
+    is_hidden: Optional[bool] = None
+
+
+class CategoryItemOut(BaseModel):
+    id: str
+    symbol: str
+    note: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CategoryOut(BaseModel):
+    id: str
+    name: str
+    color: str
+    is_hidden: bool
+    created_at: datetime
+    items: List[CategoryItemOut] = []
+
+    class Config:
+        from_attributes = True
+
+
+class CategoryItemAdd(BaseModel):
+    symbol: str = Field(min_length=1, max_length=30)
+    note: Optional[str] = Field(default=None, max_length=200)
+
+
+# ── OHLCV (interactive charts) ────────────────────────────────────────
+class OhlcvBar(BaseModel):
+    time: str  # YYYY-MM-DD
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+
+
+class OhlcvResponse(BaseModel):
+    symbol: str
+    timeframe: str
+    period: str
+    bars: List[OhlcvBar]
 
 
 # ── PEAD Scanner ──────────────────────────────────────────────────────

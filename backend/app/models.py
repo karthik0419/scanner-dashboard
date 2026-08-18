@@ -2,7 +2,8 @@
 import uuid
 from datetime import datetime
 from sqlalchemy import (
-    Column, String, Integer, Float, DateTime, Boolean, Text, ForeignKey, JSON, Enum as SAEnum
+    Column, String, Integer, Float, DateTime, Boolean, Text, ForeignKey, JSON,
+    Enum as SAEnum, Index, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 import enum
@@ -22,12 +23,14 @@ class User(Base):
     name = Column(String, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
+    role = Column(String, default="user")  # user / admin
     plan = Column(String, default="free")  # free / pro
     telegram_chat_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     saved_screens = relationship("SavedScreen", back_populates="user", cascade="all, delete-orphan")
     alerts = relationship("Alert", back_populates="user", cascade="all, delete-orphan")
+    categories = relationship("Category", back_populates="user", cascade="all, delete-orphan")
 
 
 class ScanStatus(str, enum.Enum):
@@ -69,6 +72,10 @@ class Scan(Base):
 
     picks = relationship("Pick", back_populates="scan", cascade="all, delete-orphan")
 
+    __table_args__ = (
+        Index("ix_scans_user_created", "user_id", "created_at"),
+    )
+
 
 class Pick(Base):
     __tablename__ = "picks"
@@ -103,6 +110,10 @@ class Pick(Base):
     atr = Column(Float, nullable=True)
 
     scan = relationship("Scan", back_populates="picks")
+
+    __table_args__ = (
+        Index("ix_picks_scan_score", "scan_id", "score"),
+    )
 
 
 class SavedScreen(Base):
@@ -167,6 +178,46 @@ class PaperTrade(Base):
     tradeable = Column(String, default="TRADE")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_paper_trades_user_status", "user_id", "current_status"),
+    )
+
+
+# ── Categories (shared tagging: picks / trades / watchlist) ───────────
+
+class Category(Base):
+    __tablename__ = "categories"
+
+    id = Column(String, primary_key=True, default=_uuid_str)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String(50), nullable=False)
+    color = Column(String(20), default="indigo")  # indigo/green/red/amber/blue/purple/pink/gray
+    is_hidden = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="categories")
+    items = relationship("CategoryItem", back_populates="category", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_categories_user_name"),
+    )
+
+
+class CategoryItem(Base):
+    __tablename__ = "category_items"
+
+    id = Column(String, primary_key=True, default=_uuid_str)
+    category_id = Column(String, ForeignKey("categories.id"), nullable=False, index=True)
+    symbol = Column(String, nullable=False, index=True)  # universal key across picks/trades/watchlist
+    note = Column(String(200), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    category = relationship("Category", back_populates="items")
+
+    __table_args__ = (
+        UniqueConstraint("category_id", "symbol", name="uq_category_items_cat_symbol"),
+    )
 
 
 # ── PEAD Scanner (earnings-momentum-scanner) ──────────────────────────

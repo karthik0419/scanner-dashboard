@@ -58,3 +58,10 @@ desktop.ini
 .coverage
 htmlcov/
 test_*.xml
+
+# ── Load test artifacts (locust CSV output) ──
+load_test_results_*.csv
+
+# ── Scratch / temp files ──
+_smoke_test.py
+COMMIT_MSG.txt

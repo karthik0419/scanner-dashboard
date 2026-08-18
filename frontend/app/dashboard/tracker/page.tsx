@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { api, PaperTrade, TrackerSummary, ScanDateInfo } from '@/lib/api';
+import { api, PaperTrade, TrackerSummary, ScanDateInfo, Category } from '@/lib/api';
 import { Card, CardHeader, StatCard } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Select, Label, Input } from '@/components/ui/Input';
 import { TableSkeleton, EmptyState } from '@/components/ui/States';
+import { StockChartModal } from '@/components/charts/StockChartModal';
+import { colorClasses } from '@/components/categories/CategoryTagger';
 import { fmt, fmtPct, cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { RefreshCw, Activity, TrendingUp, TrendingDown, Target, Wallet, Calendar, Zap, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { RefreshCw, Activity, TrendingUp, TrendingDown, Target, Wallet, Calendar, Zap, Clock, CheckCircle, XCircle, BarChart3 } from 'lucide-react';
 import { InstructionsBanner } from '@/components/ui/Instructions';
 
 const STATUS_OPTIONS = [
@@ -89,17 +91,22 @@ export default function TrackerPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [symbolSearch, setSymbolSearch] = useState('');
   const [selectedDate, setSelectedDate] = useState<string>(''); // '' = all dates
+  const [chartTrade, setChartTrade] = useState<PaperTrade | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState<string>(''); // category id
 
   const fetchData = useCallback(() => {
     Promise.allSettled([
       api.listTrades(),
       api.trackerDates(),
       api.trackerSummary(),
-    ]).then(([t, d, s]) => {
+      api.listCategories(true),
+    ]).then(([t, d, s, c]) => {
       if (t.status === 'fulfilled') setTrades(t.value);
       else toast.error('Failed to load trades');
       if (d.status === 'fulfilled') setDates(d.value);
       if (s.status === 'fulfilled') setSummary(s.value);
+      if (c.status === 'fulfilled') setCategories(c.value);
       setLoading(false);
     });
   }, []);
@@ -121,14 +128,29 @@ export default function TrackerPage() {
     }
   };
 
+  // Symbols hidden via hidden categories (unless that category is actively selected)
+  const hiddenSymbols = useMemo(() => {
+    const set = new Set<string>();
+    categories.filter(c => c.is_hidden && c.id !== categoryFilter).forEach(c =>
+      c.items.forEach(i => set.add(i.symbol))
+    );
+    return set;
+  }, [categories, categoryFilter]);
+
   const filtered = useMemo(() => {
+    const catSymbols = categoryFilter
+      ? new Set(categories.find(c => c.id === categoryFilter)?.items.map(i => i.symbol) || [])
+      : null;
     return trades.filter((t) => {
+      const clean = t.symbol.toUpperCase().replace('.NS', '');
       if (statusFilter && t.current_status !== statusFilter) return false;
       if (symbolSearch && !t.symbol.includes(symbolSearch.toUpperCase())) return false;
       if (selectedDate && t.scan_date && !t.scan_date.startsWith(selectedDate)) return false;
+      if (catSymbols && !catSymbols.has(clean)) return false;
+      if (!catSymbols && hiddenSymbols.has(clean)) return false;
       return true;
     });
-  }, [trades, statusFilter, symbolSearch, selectedDate]);
+  }, [trades, statusFilter, symbolSearch, selectedDate, categoryFilter, categories, hiddenSymbols]);
 
   const pnlColor = (val: number | null | undefined) =>
     cn('tabular-nums font-medium', (val ?? 0) >= 0 ? 'text-success' : 'text-danger');
@@ -284,7 +306,24 @@ export default function TrackerPage() {
             placeholder="e.g. RELIANCE"
           />
         </div>
-        {(statusFilter || symbolSearch || selectedDate) && (
+        {categories.length > 0 && (
+          <div className="w-48">
+            <Label htmlFor="category-filter">Category</Label>
+            <Select
+              id="category-filter"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+            >
+              <option value="">All Categories</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}{c.is_hidden ? ' (hidden)' : ''} · {c.items.length}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
+        {(statusFilter || symbolSearch || selectedDate || categoryFilter) && (
           <Button
             variant="ghost"
             size="sm"
@@ -292,6 +331,7 @@ export default function TrackerPage() {
               setStatusFilter('');
               setSymbolSearch('');
               setSelectedDate('');
+              setCategoryFilter('');
             }}
           >
             Clear Filters
@@ -341,10 +381,17 @@ export default function TrackerPage() {
                   return (
                     <tr
                       key={t.id}
-                      className="border-b border-border-subtle transition-colors duration-150 hover:bg-bg-hover"
+                      className="border-b border-border-subtle transition-colors duration-150 hover:bg-bg-hover cursor-pointer"
+                      onClick={() => setChartTrade(t)}
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter') setChartTrade(t); }}
+                      aria-label={`Open ${t.symbol} chart`}
                     >
                       <td className="py-2.5 px-3 font-medium text-text-primary whitespace-nowrap">
-                        {t.symbol}
+                        <span className="inline-flex items-center gap-1.5">
+                          {t.symbol}
+                          <BarChart3 className="h-3 w-3 text-text-tertiary" />
+                        </span>
                       </td>
                       <td className="py-2.5 px-3 text-text-secondary">{t.pattern || '—'}</td>
                       <td className="py-2.5 px-3">
@@ -383,6 +430,23 @@ export default function TrackerPage() {
           </div>
         )}
       </Card>
+
+      {/* Interactive chart modal */}
+      {chartTrade && (
+        <StockChartModal
+          symbol={chartTrade.symbol}
+          title={`${chartTrade.symbol.replace('.NS', '')}${chartTrade.pattern ? ' · ' + chartTrade.pattern : ''}`}
+          subtitle={`${chartTrade.current_status} · P&L ${fmtPct(chartTrade.current_pnl_pct)} · ${chartTrade.days_held}d held`}
+          levels={[
+            { price: chartTrade.entry_price, label: 'Entry', color: '#6366f1' },
+            { price: chartTrade.breakout_level, label: 'Breakout', color: '#8b5cf6' },
+            { price: chartTrade.stop_loss, label: 'SL', color: '#dc2626', style: 'dashed' },
+            { price: chartTrade.target_1, label: 'T1', color: '#16a34a', style: 'dashed' },
+            { price: chartTrade.target_2, label: 'T2', color: '#15803d', style: 'dashed' },
+          ]}
+          onClose={() => setChartTrade(null)}
+        />
+      )}
     </div>
   );
 }

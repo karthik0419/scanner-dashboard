@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { LoadingState } from '@/components/ui/States';
 import {
   LayoutDashboard, ScanLine, Save, Activity, TrendingUp, Settings,
-  LogOut, Menu, X, ChevronLeft, ChevronRight, Zap,
+  LogOut, Menu, X, ChevronLeft, ChevronRight, Zap, Star, ShieldCheck,
 } from 'lucide-react';
 
 const nav = [
@@ -17,9 +17,12 @@ const nav = [
   { href: '/dashboard/pead', label: 'PEAD Scanner', icon: Zap },
   { href: '/dashboard/screens', label: 'Saved Screens', icon: Save },
   { href: '/dashboard/tracker', label: 'Paper Tracker', icon: Activity },
+  { href: '/dashboard/watchlist', label: 'Watchlist', icon: Star },
   { href: '/dashboard/market', label: 'Market', icon: TrendingUp },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
+
+const adminNav = { href: '/dashboard/admin', label: 'Admin', icon: ShieldCheck };
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
@@ -126,11 +129,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 }
 
 function SidebarContent({ user, pathname, onLogout, collapsed }: {
-  user: { name: string; email: string };
+  user: { name: string; email: string; role?: string };
   pathname: string;
   onLogout: () => void;
   collapsed: boolean;
 }) {
+  const items = user.role === 'admin' ? [...nav, adminNav] : nav;
   return (
     <>
       {/* Header */}
@@ -143,7 +147,7 @@ function SidebarContent({ user, pathname, onLogout, collapsed }: {
 
       {/* Nav */}
       <nav className="flex-1 space-y-0.5 px-3 py-4 overflow-hidden" aria-label="Main navigation">
-        {nav.map(item => {
+        {items.map(item => {
           const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
           return (
             <Link

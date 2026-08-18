@@ -17,10 +17,19 @@ class Settings(BaseSettings):
     # ElastiCache: redis://[ELASTICACHE-ENDPOINT]:6379
     redis_url: str = "redis://localhost:6379/0"
 
+    # Environment: development / production
+    environment: str = "development"
+
     # JWT
     jwt_secret: str = "change-this-to-a-random-64-char-string"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 10080  # 7 days
+
+    # Admin bootstrap — user with this email is promoted to admin on startup
+    admin_email: str = "kartik@scanner.io"
+
+    # Guest user (demo) — disable in production via GUEST_ENABLED=false
+    guest_enabled: bool = True
 
     # Scanner-v3 path (relative to backend/ or absolute)
     # Local dev: ../../scanner-v3

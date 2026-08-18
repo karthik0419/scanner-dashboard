@@ -3,13 +3,14 @@ import os
 import signal
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from arq import create_pool
 from arq.connections import RedisSettings
 
 from app.database import get_db
 from app.config import settings
+from app.limiter import limiter
 from app.models import Scan, ScanStatus, User
 from app.deps import get_current_user
 from app.schemas import ScanTrigger, ScanOut
@@ -19,7 +20,9 @@ router = APIRouter(prefix="/api/scans", tags=["scans"])
 
 
 @router.post("/trigger", response_model=ScanOut, status_code=202)
+@limiter.limit("10/hour")
 async def trigger_scan(
+    request: Request,
     payload: ScanTrigger,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
