@@ -5,6 +5,120 @@ Append newest entries to the top.
 
 ---
 
+## 2026-08-21 — Scalability review, SL pattern analysis, Telegram MCP setup
+
+**Goal:** Three separate discussions — (1) AWS deployment plan, (2) scalability
+to 1000+ users, (3) portfolio tracker SL re-entry analysis, (4) Telegram MCP
+server setup for reading trading chats.
+
+### 1. AWS deployment plan (NOT executed — user said wait)
+
+User asked about hosting on AWS. Provided step-by-step plan for cheapest option
+(single EC2 t3.small, ap-south-1 Mumbai, ~$11/mo). All 5 containers on one box
+with Nginx reverse proxy + Let's Encrypt. User said "don't start the deployment
+wait" — plan is documented but not executed.
+
+### 2. Scalability analysis — can app handle 1000+ users?
+
+**Answer: No, not currently.** Key bottlenecks identified:
+
+| Issue | Current | Needed for 1000+ |
+|---|---|---|
+| Scan execution | 1 worker, max_jobs=1 (15-55 min/scan) | 3-5 worker replicas + shared scan model |
+| DB pool | 30 connections (pool_size=10, overflow=20) | 100+ connections |
+| Uvicorn | 1 worker | 4 workers |
+| Postgres | 512MB in Docker | RDS managed, 1GB+ |
+| Scan model | Each user triggers own scan | Shared daily scan + user filters (like Screener.in) |
+
+**Key recommendation:** Change the scan model from per-user scans to one daily
+shared scan (4 AM) with user-side filtering. This eliminates the worker
+bottleneck entirely. 1000 users filtering shared results = read-heavy dashboard
+that scales easily. Cost: $50-70/mo on ECS + RDS.
+
+### 3. SL pattern analysis (live paper tracker)
+
+Ran analysis on 181 live paper tracker picks. Findings:
+
+| Pattern | Closed | SL | Wins | SL Rate | Win Rate | Avg SL Loss |
+|---|---|---|---|---|---|---|
+| Cup & Handle | 9 | 8 | 0 | **89%** | 0% | -1.84% |
+| Double Bottom | 5 | 2 | 3 | 40% | **60%** | -1.23% |
+| C&H (Monthly) | 1 | 0 | 1 | 0% | 100% | — |
+
+**Cup & Handle is the problem — 89% SL rate, 0 wins.** Double Bottom is the
+winner (60% win rate). 1 whipsaw found (GENESYS — SL hit at -3.86%, stock later
+reached T1 for +17.19% if held).
+
+3 stocks approaching breakout (re-entry watch):
+- CASTROLIND (2.5% below breakout) — C&H pattern
+- VEDL (4.6% below) — Double Bottom (better re-entry candidate)
+- ABCAPITAL (4.8% below) — C&H pattern
+
+**Note:** Initially modified dashboard repo (tracker.py, api.ts, tracker page)
+to add re-entry endpoint + UI. User said this was wrong — re-entry logic already
+lives in paper_tracker.py for daily scripts/Telegram. **Reverted all dashboard
+changes.** Both repos clean.
+
+### 4. Telegram MCP server setup
+
+User wants Telegram chat access to identify stock patterns from trading
+chats/groups. Researched Telegram MCP servers:
+
+| Server | Tools | Transport |
+|---|---|---|
+| mcp-telegram.com (cloud) | 181 | OAuth (Claude.ai/ChatGPT only — won't work with Devin) |
+| beautyfree/mcp-telegram | 100+ | stdio (npx — works with Devin) |
+| chigwell/telegram-mcp | Full | Python/Telethon |
+
+**Selected:** beautyfree/mcp-telegram (self-hosted, npx, 100+ tools, browser QR
+login). Cloud version doesn't work with Devin CLI (uses OAuth, not stdio).
+
+**Configured:** Added to `C:\Users\91814\AppData\Roaming\devin\config.json`:
+```json
+"mcpServers": {
+  "telegram": {
+    "command": "npx",
+    "args": ["-y", "mcp-telegram"],
+    "env": {
+      "TELEGRAM_API_ID": "39794048",
+      "TELEGRAM_API_HASH": "***"
+    }
+  }
+}
+```
+
+User created app at my.telegram.org/apps (title: scanner_dashboard, short name:
+scannerIO). Needs Devin restart + QR code scan (Telegram phone app → Settings →
+Devices → Link Desktop Device) to complete login. Session saves to
+`~/.telegram-agent/`.
+
+**Status:** Config saved, awaiting Devin restart + QR login.
+
+### Files changed this session
+
+- `C:\Users\91814\AppData\Roaming\devin\config.json` — added Telegram MCP server
+- No scanner-dashboard or scanner-v3 files changed (all reverted)
+
+### Lessons (reusable)
+
+> Before adding a feature to the dashboard, check if it already exists in the
+> daily scripts. The scanner-v3 paper_tracker.py already has re-entry detection
+> (auto-checks on `update` command). The dashboard should be a view layer, not
+> a duplicate implementation. User's words: "we already have the portfolio
+> tracker and SL re-entry mechanisms in our daily scripts for our personal and
+> telegram use."
+
+> The cloud version of mcp-telegram.com only works with Claude.ai and ChatGPT
+> (OAuth connectors). Devin CLI uses stdio MCP transport — must use the
+> self-hosted npx version (beautyfree/mcp-telegram) instead.
+
+> For scaling to 1000+ users, the cheapest path is changing the scan model
+> from per-user scans to a shared daily scan with user-side filtering. This
+> is how Screener.in and Trendlyne work — one server-side scan, users just
+> filter results. Eliminates the worker bottleneck entirely.
+
+---
+
 ## 2026-08-10 — v1.1.0: Interactive charts, categories, admin, rate limiting, tests
 
 **Goal:** Add 5 new features for multi-user readiness: interactive charts,
